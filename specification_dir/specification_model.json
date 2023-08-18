@@ -1,0 +1,76 @@
+{
+    "Simulation duration": 10,
+    "Nb STAs": 2,
+    "STAs": {
+	"1": {
+	    "Datarate": 100000000,
+	    "DL traffic": {
+		"Workload": 5000000,
+		"Frame size": 11520,
+		"Random interval": true
+	    },
+	    "UL traffic": {
+		"Workload": 5000000,
+		"Frame size": 11520,
+		"Random interval": true
+	    },
+	    "Buffer capacity": 20,
+	    "Use DL slot": true,
+	    "Use DL prompt": false,
+	    "Use UL slot": false,
+	    "Use UL prompt": false,
+	    "DL slot": {
+		"Start": 0,
+		"Duration": 0.05,
+		"Interval": 0.1
+	    },
+	    "DL prompt": {
+		"Interval": 0.001
+	    },
+	    "UL slot": {
+		"Start": 0,
+		"Duration": 0.05,
+		"Interval": 0.1
+	    },
+	    "UL prompt": {
+		"Interval": 0.001
+	    }
+	},
+	"2": {
+	    "Datarate": 5,
+	    "DL traffic": {
+		"Workload": 5000000,
+		"Frame size": 11520,
+		"Random interval": true
+	    },
+	    "UL traffic": {
+		"Workload": 5000000,
+		"Frame size": 11520,
+		"Random interval": true
+	    },
+	    "Buffer capacity": 20,
+	    "Use DL slot": false,
+	    "Use DL prompt": false,
+	    "Use UL slot": false,
+	    "Use UL prompt": false,
+	    "DL slot": {
+		"Start": 0.05,
+		"Duration": 0.05,
+		"Interval": 0.1
+	    },
+	    "DL prompt": {
+		"Interval": 0.001
+	    },
+	    "UL slot": {
+		"Start": 0.05,
+		"Duration": 0.05,
+		"Interval": 0.1
+	    },
+	    "UL prompt": {
+		"Interval": 0.001
+	    }
+	}
+    },
+    "Random channel error": true,
+    "AP buffer capacity": 20
+}
