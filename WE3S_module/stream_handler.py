@@ -1,8 +1,8 @@
 from colorama import Fore
 from colorama import Style
 
-from frame_generator import *
-from common_parameters import *
+from WE3S.frame_generator import *
+from WE3S.common_parameters import *
 
 class Stream:
 
@@ -15,7 +15,7 @@ class Stream:
         self.slot = None
         self.received_prompt = None
 
-        self.current_time = 0
+        self.current_time = Timestamp()
 
 
 ### INITIALIZATION and related functions
@@ -94,7 +94,7 @@ class Stream:
             if self.slot.is_in_SP(tmp):
                 return -1
             else:
-                transmission_time = self.slot.get_next_SP_start(self.current_time + delay) + TIME_PRECISION
+                transmission_time = self.slot.get_next_SP_start(self.current_time + delay) + SIFS
                 assert(self.slot.is_in_SP(transmission_time))
                 return transmission_time
         else:
@@ -103,7 +103,7 @@ class Stream:
             if self.slot.is_in_SP(transmission_time):
                 return transmission_time
             else:
-                revised_transmission_time = self.slot.get_next_SP_start(transmission_time) + TIME_PRECISION
+                revised_transmission_time = self.slot.get_next_SP_start(transmission_time) + SIFS
                 assert(self.slot.is_in_SP(revised_transmission_time))
                 return revised_transmission_time
 
@@ -157,7 +157,7 @@ class Stream:
     def is_up_to_date(self):
         return self.current_time < self.scheduled_frame.creation_time
 
-    def get_buffer_size(self):
+    def get_number_of_pending_frames(self):
         return len(self.pending_frame_table)
 
     def get_scheduled_frame_creation_time(self):
@@ -282,7 +282,7 @@ class Beacon_stream(Stream):
         Stream.__init__(self)
         self.priority = 1
         self.frame_generator = Frame_generator(1, BEACON_SIZE, 0, 0, "beacon", False)
-        self.frame_generator.set_frequency(1 / TBTT)
+        self.frame_generator.set_frequency(1 / float(TBTT))
         # self.frame_generator.is_interval_random = False
 
     def update_time(self, current_time):

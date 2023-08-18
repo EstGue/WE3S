@@ -1,10 +1,12 @@
 from colorama import Fore
 from colorama import Style
 
+from WE3S.timestamp import *
+
 class Record:
     def __init__(self):
         self.event_record = []
-        self.current_time = 0
+        self.current_time = Timestamp()
 
     def add_event(self, new_event):
         if self.current_time > new_event.start:
@@ -28,7 +30,7 @@ class Record:
             i += 1
             result[key] = event.get_dictionary()
         return result
-        
+
     def __str__(self):
         result = "---\n"
         for event in self.event_record:

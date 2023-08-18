@@ -6,11 +6,11 @@ import gc
 import time
 import random
 
-from event import *
-from record import *
-from AP import *
-from STA import *
-from slot import *
+from WE3S.event import *
+from WE3S.record import *
+from WE3S.AP import *
+from WE3S.STA import *
+from WE3S.slot import *
 
 
 class Event_handler:
@@ -19,7 +19,7 @@ class Event_handler:
         self.events = []
         self.contenders = []
         self.next_event = None
-        self.current_time = 0
+        self.current_time = Timestamp()
         self.sent_frames = SortedSet()
         self.record = Record()
         self.PER = PER
@@ -43,10 +43,20 @@ class Event_handler:
         assert(throughput > 0)
         self.contenders[STA_ID].set_DL_throughput(throughput, is_interval_random)
 
+    def set_DL_frame_size(self, STA_ID, frame_size):
+        assert(STA_ID > 0 and STA_ID < len(self.contenders))
+        assert(frame_size > 0)
+        self.contenders[STA_ID].set_DL_frame_size(frame_size)
+        
     def set_UL_throughput(self, STA_ID, throughput, is_interval_random):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
         assert(throughput > 0)
         self.contenders[STA_ID].set_UL_throughput(throughput, is_interval_random)
+
+    def set_UL_frame_size(self, STA_ID, frame_size):
+        assert(STA_ID > 0 and STA_ID < len(self.contenders))
+        assert(frame_size > 0)
+        self.contenders[STA_ID].set_UL_frame_size(frame_size)
 
     def set_link_capacity(self, STA_ID, link_capacity):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
@@ -54,12 +64,14 @@ class Event_handler:
         ap = self.contenders[0]
         ap.wlan.set_link_capacity(STA_ID, link_capacity)
 
-    def set_buffer_size_AP(self, buffer_size):
-        assert(buffer_size > 0)
-        self.contenders[0].buffer_capacity = buffer_size
+    def set_buffer_capacity_AP(self, buffer_capacity):
+        assert(buffer_capacity > 0)
+        self.contenders[0].buffer_capacity = buffer_capacity
 
-    def set_buffer_size_STA(self, STA_ID, buffer_size):
-        self.contenders[STA_ID].buffer_capacity = buffer_size
+    def set_buffer_capacity_STA(self, STA_ID, buffer_capacity):
+        assert(STA_ID > 0 and STA_ID < len(self.contenders))
+        assert(buffer_capacity > 0)
+        self.contenders[STA_ID].buffer_capacity = buffer_capacity
 
     def toggle_DL_slot(self, STA_ID, first_start, duration, interval):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
@@ -91,7 +103,7 @@ class Event_handler:
 
     def deactivate_random_error_on_frame(self):
         self.PER = None
-        
+
     ## HANDLE EVENTS
 
     def retrieve_events(self):
@@ -100,7 +112,7 @@ class Event_handler:
             event = contender.get_next_event(self.current_time)
             if event is not None:
                 assert(event.start >= self.current_time)
-                for frame in event.frames:
+                for frame in event.frame_table:
                     assert(frame.sender_ID == contender.ID)
                     if frame.creation_time > event.start:
                         print(f"{Fore.RED}The event cannot start before the frame was created.")
@@ -112,12 +124,13 @@ class Event_handler:
 
     def elect_next_event(self):
         earliest_events = self.get_earliest_events()
-        if len(earliest_events) == 0 or earliest_events[0].start - self.current_time > MAX_NO_EVENT_PERIOD:
-            self.next_event = Event(self.current_time + MAX_NO_EVENT_PERIOD, 0, None)
+        if len(earliest_events) == 0:
+            # This point should be never reached.
+            self.next_event = Event(self.current_time + 0.1, 0, None)
         elif len(earliest_events) == 1:
             # Error on the frame
             self.next_event = earliest_events[0]
-            for frame in self.next_event.frames:
+            for frame in self.next_event.frame_table:
                 frame.nb_of_transmissions += 1
                 if self.PER is not None and random.randint(1, 1 / self.PER) == 1:
                     frame.is_in_error = True
@@ -128,15 +141,15 @@ class Event_handler:
                         print(f"{Style.RESET_ALL}")
                     assert(not frame.ID in self.sent_frames)
                     self.sent_frames.add(frame.ID)
-                    
+
         else:
             # Collision
             duration = max([event.duration for event in earliest_events])
             start = earliest_events[0].start
-            self.next_event = Event(start, duration, None)
+            self.next_event = Event(start, duration, [])
             for event in earliest_events:
-                self.next_event.frames += event.frames
-            for frame in self.next_event.frames:
+                self.next_event.frame_table += event.frame_table
+            for frame in self.next_event.frame_table:
                 frame.nb_of_transmissions += 1
                 frame.has_collided = True
         self.current_time = self.next_event.end
@@ -145,10 +158,10 @@ class Event_handler:
 
     def verify_next_event(self):
         event = self.next_event
-        for frame in event.frames:
+        for frame in event.frame_table:
             if frame.sender_ID == frame.receiver_ID:
                 assert(frame.label == "beacon")
-                assert(len(event.frames) == 1 or frame.has_collided)
+                assert(len(event.frame_table) == 1 or frame.has_collided)
             elif frame.label == "UL Tx" or frame.label == "DL prompt":
                 assert(frame.receiver_ID == 0)
                 assert(frame.sender_ID != 0)
@@ -160,11 +173,11 @@ class Event_handler:
                     assert(frame.receiver_ID != 0)
                 elif frame.sender_ID != 0:
                     assert(frame.receiver_ID == 0)
-            
+
     def inform_contenders(self):
         for contender in self.contenders:
             contender.update_information(self.next_event)
-        for frame in self.next_event.frames:
+        for frame in self.next_event.frame_table:
             frame.is_in_error = False
             frame.has_collided = False
 
@@ -190,7 +203,7 @@ class Event_handler:
                     earliest_start = event.start
             earliest_events = []
             for event in self.events:
-                if abs(event.start - earliest_start) < TIME_PRECISION:
+                if event.start == earliest_start:
                     earliest_events.append(event)
             return earliest_events
     

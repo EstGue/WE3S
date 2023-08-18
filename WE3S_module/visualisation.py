@@ -1,7 +1,9 @@
+from WE3S.timestamp import *
+
 class Visualisation:
     def __init__(self, scale=50*10**-6):
         self.timeline = ""
-        self.timeline_current_time = 0
+        self.timeline_current_time = Timestamp()
         self.scale = scale
         self.max_timeline_length = 200
         self.timeline_file = None

@@ -1,12 +1,12 @@
-from contender import *
-from stream_handler import *
+from WE3S.contender import *
+from WE3S.stream_handler import *
 
 class AP(Contender):
 
     def __init__(self, ID):
         Contender.__init__(self, ID)
 
-        self.buffer_capacity = AP_BUFFER_SIZE
+        self.buffer_capacity = AP_BUFFER_CAPACITY
 
         self.stream_table = [Beacon_stream()]
         self.stream_information = dict()
@@ -156,7 +156,7 @@ class AP(Contender):
     def no_pending_stream(self):
         for stream in self.stream_table:
             transmission_time = stream.get_transmission_time(self.backoff)
-            if transmission_time is not None and transmission_time == -1:
+            if transmission_time is not None and transmission_time < 0:
                 return False
         return True
     
@@ -190,10 +190,9 @@ class AP(Contender):
         if stream.use_slot():
             assert(stream.slot.is_in_SP(event_start))
         event_frames = stream.get_frames().copy()
-        event = Event(event_start, event_duration, None)
-        event.frames = event_frames
+        event = Event(event_start, event_duration, event_frames)
         return event
-    
+
 
     def create_event_start(self, stream):
         if self.received_DL_prompt != -1:
@@ -227,11 +226,11 @@ class AP(Contender):
         data_rate = self.wlan.get_link_capacity(stream.get_destination_ID())
         frame_table = stream.get_frames()[:MAX_AGGREGATED_FRAMES]
         is_ACK = len(frame_table) == 1 and frame_table[0].label == "ACK"
-        total_size = sum([frame.length for frame in frame_table])
+        total_size = sum([frame.size for frame in frame_table])
         total_size += MAC_HEADER_SIZE
         if not is_ACK:
             total_size += ACK_SIZE
-        event_duration = total_size / data_rate
+        event_duration = Timestamp(total_size / data_rate)
         event_duration += PHY_HEADER_DURATION
         if not is_ACK:
             event_duration += ACK_DURATION
@@ -268,7 +267,7 @@ class AP(Contender):
 
     def remove_sent_frames(self, event):
         if not event.is_collision():
-            for frame in event.frames.copy():
+            for frame in event.frame_table.copy():
                 if frame.sender_ID == self.ID and not frame.is_in_error:
                     stream_index = None
                     if frame.label == "DL Tx":
@@ -288,7 +287,7 @@ class AP(Contender):
                         self.stream_table[stream_index].remove_frame(frame.ID)
         else:
         # The beacon is not re-emitted in case of collision or error.
-            for frame in event.frames:
+            for frame in event.frame_table:
                 if frame.label == "beacon":
                     self.stream_table[0].remove_frame(frame.ID)
         if self.received_DL_prompt != -1:
@@ -298,13 +297,13 @@ class AP(Contender):
 
     def update_received_DL_prompt(self, event):
         if not event.is_collision() and not event.is_error() and event.is_receiver(self.ID):
-            if len(event.frames) == 1 and event.frames[0].label == "DL prompt":
-                assert(self.stream_information[str(event.frames[0].sender_ID)]["use DL prompt"])
-                self.received_DL_prompt = event.frames[0].sender_ID
+            if len(event.frame_table) == 1 and event.frame_table[0].label == "DL prompt":
+                assert(self.stream_information[str(event.frame_table[0].sender_ID)]["use DL prompt"])
+                self.received_DL_prompt = event.frame_table[0].sender_ID
 
     def update_UL_prompt_answer(self, event):
         if self.sent_UL_prompt != -1:
-            for frame in event.frames:
+            for frame in event.frame_table:
                 assert(frame.sender_ID == self.sent_UL_prompt or frame.has_collided)
             if event.is_EOSP:
                 self.sent_UL_prompt = -1
@@ -330,7 +329,7 @@ class AP(Contender):
     def get_number_of_pending_frames(self):
         total_nb_frames = 0
         for stream in self.stream_table:
-            total_nb_frames += stream.get_buffer_size()
+            total_nb_frames += stream.get_number_of_pending_frames()
         return total_nb_frames
 
     def get_index_of_oldest_scheduled_frame(self):
@@ -365,7 +364,7 @@ class AP(Contender):
     def update_timeline(self, event):
         if DEBUG:
             self.timeline[0].add_until(event.start, '-')
-            if len(event.frames) == 1 and event.frames[0].label == "beacon":
+            if len(event.frame_table) == 1 and event.frame_table[0].label == "beacon":
                 self.timeline[0].add_until(event.end, 'b')
             if event.is_sender(self.ID):
                 self.timeline[0].add_until(event.end, 'v')

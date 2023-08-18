@@ -1,33 +1,40 @@
 import os
-import json
 from sortedcontainers import SortedSet
 
 from .common_parameters import *
 
 class Results():
-    def __init__(self, dir_name, file_name, record_data = None):
-        self.dir_name = dir_name
-        self.file_name = file_name
-        if record_data is None:
-            self.record_data = {}
-        else:
-            self.record_data = record_data
+    def __init__(self, record_data):
+        self.record_data = record_data
 
         self.simulation_duration = -1
         self.nb_events = -1
         self.nb_STAs = -1
         
         ## THEORITICAL RESULTS: what was supposed to happen?
-        self.th_saturation = -1
-        self.th_DL_throughput = -1
-        self.th_UL_throughput = -1
-        self.th_tot_throughput = -1
+        self.th_busy_time_medium = -1
+        
+        self.th_busy_time_STA = []
+        self.th_busy_time_avg = -1
+        self.th_busy_time_std = -1
+
+        self.th_DL_throughput_STA = []
+        self.th_DL_throughput_avg = -1
+        self.th_DL_throughput_std = -1
+        
+        self.th_UL_throughput_STA = []
+        self.th_UL_throughput_avg = -1
+        self.th_UL_throughput_std = -1
+
+        self.th_tot_throughput_STA = []
+        self.th_tot_throughput_avg = -1
+        self.th_tot_throughput_std = -1
         
         ## PRACTICAL RESULTS: what really happened in the simulation
+        self.busy_time_medium = -1
         self.busy_time_STA = []
         self.busy_time_avg = -1
         self.busy_time_std = -1
-        self.network_busy_time = -1
 
         self.Tx_attempts_STA = []
         self.Tx_attempts_AP = -1
@@ -127,25 +134,15 @@ class Results():
         self.consumption_avg = -1
         self.consumption_std = -1
 
-        if self.dir_name is not None and self.file_name is not None:
-            assert(self.record_data == {})
-            self.load_file()
-            self.compute_results()
-        elif self.record_data != {}:
-            self.compute_results()
+        self.compute_results()
 
-    def load_file(self):
-        record_file = open(os.path.join(self.dir_name, self.file_name), "r")
-        self.record_data = json.load(record_file)
-        record_file.close()
 
     def compute_results(self):
-        self.get_th_DL_throughput_avg()
-        self.get_th_UL_throughput_avg()
-        self.get_th_tot_throughput_avg()
-        self.get_th_saturation()
+        self.get_th_throughput()
+        self.get_th_busy_time()
 
         self.get_simulation_duration()
+        self.get_number_of_events()
         self.get_nb_STAs()
 
         self.compute_busy_time()
@@ -162,46 +159,50 @@ class Results():
         self.compute_energy_consumption()
 
 
-        
-    def get_th_DL_throughput_avg(self):
-        if self.th_DL_throughput == -1:
+    def get_th_throughput(self):
+        if len(self.th_DL_throughput_STA) == 0 or len(self.th_UL_throughput_STA) == 0 or len(self.th_tot_throughput_STA) == 0:
             self.get_nb_STAs()
-            self.th_DL_throughput = 0
-            for contender in self.record_data["STAs"]:
-                if contender != "AP":
-                    STA_dict = self.record_data["STAs"][contender]
-                    self.th_DL_throughput += STA_dict["DL_traffic"]["Throughput"]
-            self.th_DL_throughput /= self.nb_STAs
+            for sta in self.record_data["STAs"]:
+                STA_dict = self.record_data["STAs"][sta]
+                DL_throughput = STA_dict["DL traffic"]["Throughput"]
+                UL_throughput = STA_dict["UL traffic"]["Throughput"]
+                self.th_DL_throughput_STA.append(DL_throughput)
+                self.th_UL_throughput_STA.append(UL_throughput)
+                self.th_tot_throughput_STA.append(DL_throughput + UL_throughput)
+                
+            assert(len(self.th_DL_throughput_STA) == self.nb_STAs)
+            assert(len(self.th_UL_throughput_STA) == self.nb_STAs)
+            assert(len(self.th_tot_throughput_STA) == self.nb_STAs)
             
+            self.th_DL_throughput_avg = sum(self.th_DL_throughput_STA) / self.nb_STAs
+            self.th_UL_throughput_avg = sum(self.th_UL_throughput_STA) / self.nb_STAs
+            self.th_tot_throughput_avg = sum(self.th_tot_throughput_STA) / self.nb_STAs
 
-    def get_th_UL_throughput_avg(self):
-        if self.th_UL_throughput == -1:
+            self.th_DL_throughput_std = sum([(DL_th - self.th_DL_throughput_avg)**2 for DL_th in self.th_DL_throughput_STA])
+            self.th_DL_throughput_std = (self.th_DL_throughput_std / self.nb_STAs) **.5
+            self.th_UL_throughput_std = sum([(UL_th - self.th_UL_throughput_avg)**2 for UL_th in self.th_UL_throughput_STA])
+            self.th_UL_throughput_std = (self.th_UL_throughput_std / self.nb_STAs) **.5
+            self.th_tot_throughput_std = sum([(tot_th - self.th_tot_throughput_avg)**2 for tot_th in self.th_tot_throughput_STA])
+            self.th_tot_throughput_std = (self.th_tot_throughput_std / self.nb_STAs) **.5
+
+
+    def get_th_busy_time(self):
+        if len(self.th_busy_time_STA) == 0:
             self.get_nb_STAs()
-            self.th_UL_throughput = 0
-            for contender in self.record_data["STAs"]:
-                if contender != "AP":
-                    STA_dict = self.record_data["STAs"][contender]
-                    self.th_UL_throughput += STA_dict["UL_traffic"]["Throughput"]
-            self.th_UL_throughput /= self.nb_STAs
+            for sta in self.record_data["STAs"]:
+                STA_dict = self.record_data["STAs"][sta]
+                DL_throughput = STA_dict["DL traffic"]["Throughput"]
+                UL_throughput = STA_dict["UL traffic"]["Throughput"]
+                datarate = STA_dict["Datarate"]
+                self.th_busy_time_STA.append((DL_throughput + UL_throughput) / datarate)
+            assert(len(self.th_busy_time_STA) == self.nb_STAs)
 
-                    
-    def get_th_tot_throughput_avg(self):
-        if self.th_tot_throughput == -1:
-            self.get_th_DL_throughput_avg()
-            self.get_th_UL_throughput_avg()
-            self.th_tot_throughput = self.th_DL_throughput + self.th_UL_throughput
-
-    def get_th_saturation(self):
-        if self.th_saturation == -1:
-            self.th_saturation = 0
-            for contender in self.record_data["STAs"]:
-                if contender != "AP":
-                    STA_dict = self.record_data["STAs"][contender]
-                    self.th_saturation += STA_dict["DL_traffic"]["Throughput"] / STA_dict["Link capacity"]
-                    self.th_saturation += STA_dict["UL_traffic"]["Throughput"] / STA_dict["Link capacity"]
+            self.th_busy_time_avg = sum(self.th_busy_time_STA) / self.nb_STAs
+            self.th_busy_time_std = sum([(bt - self.th_busy_time_avg)**2 for bt in self.th_busy_time_STA])
+            self.th_busy_time_std = (self.th_busy_time_std / self.nb_STAs) **.5
+            self.th_busy_time_medium = sum(self.th_busy_time_STA)
 
 
-                    
     def get_simulation_duration(self):
         if self.simulation_duration == -1:
             for event in self.record_data["Events"]:
@@ -214,17 +215,18 @@ class Results():
             for contender in self.record_data["STAs"]:
                 if contender != "AP":
                     self.nb_STAs += 1
-            
+
     def get_number_of_events(self):
         if self.nb_events == -1:
-            return len(self.record_data["Events"])
+            self.nb_events = len(self.record_data["Events"])
 
-        
+
     def compute_busy_time(self):
         if len(self.busy_time_STA) == 0:
             self.get_nb_STAs()
             self.get_simulation_duration()
-            self.busy_time_STA = [0 for i in range(self.nb_STAs + 1)]
+            self.busy_time_STA = [0 for i in range(self.nb_STAs)]
+            self.busy_time_medium = 0
             for event in self.record_data["Events"]:
                 event_dict = self.record_data["Events"][event]
                 STA_IDs = SortedSet()
@@ -233,11 +235,12 @@ class Results():
                     STA_IDs.add(frame_dict["Sender ID"])
                     STA_IDs.add(frame_dict["Receiver ID"])
                 for sta in STA_IDs:
-                    self.busy_time_STA[sta] += event_dict["Duration"]
-                self.network_busy_time += event_dict["Duration"]
-            for x in self.busy_time_STA:
-                x /= self.simulation_duration
-            self.network_busy_time /= self.simulation_duration
+                    if sta != 0:
+                        self.busy_time_STA[sta-1] += event_dict["Duration"]
+                self.busy_time_medium += event_dict["Duration"]
+            for i in range(self.nb_STAs):
+                self.busy_time_STA[i] /= self.simulation_duration
+            self.busy_time_medium /= self.simulation_duration
 
             self.busy_time_avg = sum(self.busy_time_STA) / (self.nb_STAs + 1)
             self.busy_time_std = sum([(x - self.busy_time_avg)**2 for x in self.busy_time_STA])
@@ -257,12 +260,12 @@ class Results():
                     frame_dict = event_dict["Frames"][frame]
                     if frame_dict["Label"] == "DL Tx" and not frame_dict["Collision"] and not frame_dict["Error"]:
                         STA_ID = frame_dict["Receiver ID"] - 1 # Minus 1 to get the proper index 
-                        self.DL_throughput_STA[STA_ID] += frame_dict["Length"]
-                        self.tot_throughput_STA[STA_ID] += frame_dict["Length"]
+                        self.DL_throughput_STA[STA_ID] += frame_dict["Size"]
+                        self.tot_throughput_STA[STA_ID] += frame_dict["Size"]
                     elif frame_dict["Label"] == "UL Tx" and not frame_dict["Collision"] and not frame_dict["Error"]:
                         STA_ID = frame_dict["Sender ID"] - 1 # Minus 1 to get the proper index
-                        self.UL_throughput_STA[STA_ID] += frame_dict["Length"]
-                        self.tot_throughput_STA[STA_ID] += frame_dict["Length"]
+                        self.UL_throughput_STA[STA_ID] += frame_dict["Size"]
+                        self.tot_throughput_STA[STA_ID] += frame_dict["Size"]
             for sta in range(self.nb_STAs):
                 self.DL_throughput_STA[sta] /= self.simulation_duration
                 self.UL_throughput_STA[sta] /= self.simulation_duration
@@ -387,10 +390,10 @@ class Results():
                 if sta != "AP":
                     STA_dict = self.record_data["STAs"][sta]
                     STA_ID = STA_dict["ID"] - 1 # Minus 1 to get the proper index
-                    self.DL_generated_frames_STA[STA_ID] += STA_dict["DL_traffic"]["Frame counter"]
-                    self.UL_generated_frames_STA[STA_ID] += STA_dict["UL_traffic"]["Frame counter"]
-                    self.tot_generated_frames_STA[STA_ID] += STA_dict["DL_traffic"]["Frame counter"]
-                    self.tot_generated_frames_STA[STA_ID] += STA_dict["UL_traffic"]["Frame counter"]
+                    self.DL_generated_frames_STA[STA_ID] += STA_dict["DL traffic"]["Frame counter"]
+                    self.UL_generated_frames_STA[STA_ID] += STA_dict["UL traffic"]["Frame counter"]
+                    self.tot_generated_frames_STA[STA_ID] += STA_dict["DL traffic"]["Frame counter"]
+                    self.tot_generated_frames_STA[STA_ID] += STA_dict["UL traffic"]["Frame counter"]
                     
             self.DL_generated_frames_avg = sum(self.DL_generated_frames_STA) / self.nb_STAs
             self.UL_generated_frames_avg = sum(self.UL_generated_frames_STA) / self.nb_STAs
@@ -549,121 +552,145 @@ class Results():
         result["Simulation duration"] = self.simulation_duration
         result["Number of events"] = self.nb_events
         result["Number of STAs"] = self.nb_STAs
-        
-        result["Theoritical saturation"] = self.th_saturation
-        result["Theoritical DL throughput avg"] = self.th_DL_throughput
-        result["Theoritical UL throughput avg"] = self.th_UL_throughput
-        result["Theoritical tot throughput avg"] = self.th_tot_throughput
+
+        result["Theoritical busy time medium"] = self.th_busy_time_medium
+        th_busy_time_dict = dict()
+        for x,y in enumerate(self.th_busy_time_STA):
+            th_busy_time_dict[str(x+1)] = y
+        result["Theoritical busy time STA"] = th_busy_time_dict
+        result["Theoritical busy time avg"] = self.th_busy_time_avg
+        result["Theoritical busy time std"] = self.th_busy_time_std
+
+        th_DL_throughput = dict()
+        for x,y in enumerate(self.th_DL_throughput_STA):
+            th_DL_throughput[str(x+1)] = y
+        result["Theoritical DL throughput STA"] = th_DL_throughput
+        result["Theoritical DL throughput avg"] = self.th_DL_throughput_avg
+        result["Theoritical DL throughput std"] = self.th_DL_throughput_std
+
+        th_UL_throughput = dict()
+        for x,y in enumerate(self.th_UL_throughput_STA):
+            th_UL_throughput[str(x+1)] = y
+        result["Theoritical UL throughput STA"] = th_UL_throughput
+        result["Theoritical UL throughput avg"] = self.th_UL_throughput_avg
+        result["Theoritical UL throughput std"] = self.th_UL_throughput_std
+
+        th_tot_throughput = dict()
+        for x,y in enumerate(self.th_tot_throughput_STA):
+            th_tot_throughput[str(x+1)] = y
+        result["Theoritical tot throughput STA"] = th_tot_throughput
+        result["Theoritical tot throughput avg"] = self.th_tot_throughput_avg
+        result["Theoritical tot throughput std"] = self.th_tot_throughput_std
 
         busy_time = dict()
         for x,y in enumerate(self.busy_time_STA):
-            busy_time[str(x)] = y
+            busy_time[str(x+1)] = y
         result["Busy time STA"] = busy_time
         result["Busy time avg"] = self.busy_time_avg 
         result["Busy time std"] = self.busy_time_std
-        result["Network busy time"] = self.network_busy_time
+        result["Busy time medium"] = self.busy_time_medium
 
         DL_throughput = dict()
         for x,y in enumerate(self.DL_throughput_STA):
-            DL_throughput[str(x)] = y
+            DL_throughput[str(x+1)] = y
         result["DL throughput STA"] = DL_throughput
         result["DL throughput avg"] = self.DL_throughput_avg
         result["DL throughput std"] = self.DL_throughput_std
 
         UL_throughput = dict()
         for x,y in enumerate(self.UL_throughput_STA):
-            UL_throughput[str(x)] = y
+            UL_throughput[str(x+1)] = y
         result["UL throughput STA"] = UL_throughput
         result["UL throughput avg"] = self.UL_throughput_avg
         result["UL throughput std"] = self.UL_throughput_std
 
         tot_throughput = dict()
         for x,y in enumerate(self.tot_throughput_STA):
-            tot_throughput[str(x)] = y
+            tot_throughput[str(x+1)] = y
         result["Tot throughput STA"] = tot_throughput
         result["Tot throughput avg"] = self.tot_throughput_avg
         result["Tot throughput std"] = self.tot_throughput_std
 
         DL_sent_frames = dict()
         for x,y in enumerate(self.DL_sent_frames_STA):
-            DL_sent_frames[str(x)] = y
+            DL_sent_frames[str(x+1)] = y
         result["DL sent frames STA"] = DL_sent_frames
         result["DL sent frames avg"] = self.DL_sent_frames_avg
         result["DL sent frames std"] = self.DL_sent_frames_std
 
         UL_sent_frames = dict()
         for x,y in enumerate(self.UL_sent_frames_STA):
-            UL_sent_frames[str(x)] = y
+            UL_sent_frames[str(x+1)] = y
         result["UL sent frames STA"] = UL_sent_frames
         result["UL sent frames avg"] = self.UL_sent_frames_avg
         result["UL sent frames std"] = self.UL_sent_frames_std
 
         tot_sent_frames = dict()
         for x,y in enumerate(self.tot_sent_frames_STA):
-            tot_sent_frames[str(x)] = y
+            tot_sent_frames[str(x+1)] = y
         result["Tot sent frames STA"] = tot_sent_frames
         result["Tot sent frames avg"] = self.tot_sent_frames_avg
         result["Tot sent frames std"] = self.tot_sent_frames_std
 
         DL_prompts = dict()
         for x,y in enumerate(self.nb_DL_prompts_STA):
-            DL_prompts[str(x)] = y
+            DL_prompts[str(x+1)] = y
         result["DL_Prompts STA"] = DL_prompts
         result["DL_Prompts avg"] = self.nb_DL_prompts_avg
         result["DL_Prompts std"] = self.nb_DL_prompts_std
 
         ACK = dict()
         for x,y in enumerate(self.nb_ACK_STA):
-            ACK[str(x)] = y
+            ACK[str(x+1)] = y
         result["ACK STA"] = ACK
         result["ACK avg"] = self.nb_ACK_avg
         result["ACK std"] = self.nb_ACK_std
         
         DL_gen = dict()
         for x,y in enumerate(self.DL_generated_frames_STA):
-            DL_gen[str(x)] = y
+            DL_gen[str(x+1)] = y
         result["DL generated frames STA"] = DL_gen
         result["DL generated frames avg"] = self.DL_generated_frames_avg
         result["DL generated frames std"] = self.DL_generated_frames_std
 
         UL_gen = dict()
         for x,y in enumerate(self.UL_generated_frames_STA):
-            UL_gen[str(x)] = y
+            UL_gen[str(x+1)] = y
         result["UL generated frames STA"] = UL_gen
         result["UL generated frames avg"] = self.UL_generated_frames_avg
         result["UL generated frames std"] = self.UL_generated_frames_std
 
         tot_gen = dict()
         for x,y in enumerate(self.tot_generated_frames_STA):
-            tot_gen[str(x)] = y
+            tot_gen[str(x+1)] = y
         result["Tot generated frames STA"] = tot_gen
         result["Tot generated frames avg"] = self.tot_generated_frames_avg
         result["Tot generated frames std"] = self.tot_generated_frames_std
 
         DL_delay = dict()
         for x,y in enumerate(self.DL_delay_STA):
-            DL_delay[str(x)] = y
+            DL_delay[str(x+1)] = y
         result["DL delay STA"] = DL_delay
         result["DL delay avg"] = self.DL_delay_avg
         result["DL delay std"] = self.DL_delay_std
 
         UL_delay = dict()
         for x,y in enumerate(self.UL_delay_STA):
-            UL_delay[str(x)] = y
+            UL_delay[str(x+1)] = y
         result["UL delay STA"] = UL_delay
         result["UL delay avg"] = self.UL_delay_avg
         result["UL delay std"] = self.UL_delay_std
 
         tot_delay = dict()
         for x,y in enumerate(self.tot_delay_STA):
-            tot_delay[str(x)] = y
+            tot_delay[str(x+1)] = y
         result["Tot delay STA"] = tot_delay
         result["Tot delay avg"] = self.tot_delay_avg
         result["Tot delay std"] = self.tot_delay_std
 
         collision_rate = dict()
         for x,y in enumerate(self.collision_rate_STA):
-            collision_rate[str(x)] = y
+            collision_rate[str(x+1)] = y
         result["Collision rate STA"] = collision_rate
         result["Collision rate AP"] = self.collision_rate_AP
         result["Collision rate STA avg"] = self.collision_rate_STA_avg
@@ -671,7 +698,7 @@ class Results():
         
         error_rate = dict()
         for x,y in enumerate(self.error_rate_STA):
-            error_rate[str(x)] = y
+            error_rate[str(x+1)] = y
         result["Error rate STA"] = error_rate
         result["Error rate AP"] = self.error_rate_AP
         result["Error rate STA avg"] = self.error_rate_STA_avg
@@ -679,44 +706,45 @@ class Results():
         
         idle = dict()
         for x,y in enumerate(self.idle_STA):
-            idle[str(x)] = y
+            idle[str(x+1)] = y
         result["idle STA"] = idle
         result["idle avg"] = self.idle_avg
         result["idle std"] = self.idle_std
 
         CCA = dict()
         for x,y in enumerate(self.CCA_STA):
-            CCA[str(x)] = y
+            CCA[str(x+1)] = y
         result["CCA STA"] = CCA
         result["CCA avg"] = self.CCA_avg
         result["CCA std"] = self.CCA_std
 
         Rx = dict()
         for x,y in enumerate(self.Rx_STA):
-            Rx[str(x)] = y
+            Rx[str(x+1)] = y
         result["Rx STA"] = Rx
         result["Rx avg"] = self.Rx_avg
         result["Rx std"] = self.Rx_std
 
         Tx = dict()
         for x,y in enumerate(self.Tx_STA):
-            Tx[str(x)] = y
+            Tx[str(x+1)] = y
         result["Tx STA"] = Tx
         result["Tx avg"] = self.Tx_avg
         result["Tx stdx"] = self.Tx_std
 
         doze = dict()
         for x,y in enumerate(self.doze_STA):
-            doze[str(x)] = y
+            doze[str(x+1)] = y
         result["doze STA"] = doze
         result["doze avg"] = self.doze_avg
         result["doze std"] = self.doze_std
 
         consumption = dict()
         for x,y in enumerate(self.consumption_STA):
-            consumption[str(x)] = y
+            consumption[str(x+1)] = y
         result["Consumption STA"] = consumption
         result["Consumption avg"] = self.consumption_avg
         result["Consumption std"] = self.consumption_std
-
+        
         return result
+    

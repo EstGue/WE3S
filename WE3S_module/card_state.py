@@ -2,27 +2,24 @@ from colorama import Fore
 from colorama import Style
 from sortedcontainers import SortedSet
 
-
-from event import *
-from visualisation import *
-from common_parameters import *
+from WE3S.event import *
+from WE3S.visualisation import *
+from WE3S.common_parameters import *
 
 class Card_state:
 
     def __init__(self, STA_ID):
         self.STA_ID = STA_ID
         
-        self.Rx = 0
-        self.Tx = 0
-        self.CCA_busy = 0
-        self.idle = 0
-        self.doze = 0
+        self.Rx = Timestamp(0)
+        self.Tx = Timestamp(0)
+        self.CCA_busy = Timestamp(0)
+        self.idle = Timestamp(0)
+        self.doze = Timestamp(0)
 
-        self.current_time = 0
+        self.current_time = Timestamp(0)
 
-        # self.scheduled_doze_table = SortedSet()
-
-        self.wakeup_time = -1
+        self.wakeup_time = None
         self.DL_slot = None
         
         self.timeline = None
@@ -57,7 +54,9 @@ class Card_state:
 
     def nothing_happens_until(self, time):
         if self.DL_slot is None:
-            if self.wakeup_time <= self.current_time:
+            if self.wakeup_time is None:
+                self.idle_until(time)
+            elif Timestamp(self.wakeup_time) <= self.current_time:
                 self.idle_until(time)
             else:
                 if self.wakeup_time < time:
@@ -84,8 +83,8 @@ class Card_state:
                         self.idle_until(min(next_SP_end, time))
                         if time <= next_SP_end:
                             finish = True
-                        
-                    
+
+
 
     def add_event_not_participating(self, event):
         if self.DL_slot is None:
@@ -126,20 +125,6 @@ class Card_state:
         self.idle_until(event.start)
         self.Rx_until(event.end)
 
-    # def add_event_not_participating(self, event):
-    #     if len(self.scheduled_doze_table) == 0:
-    #         self.CCA_busy_until(event.end)
-    #     concerned_doze = []
-    #     i = 0
-    #     while i < len(self.scheduled_doze_table) and self.scheduled_doze_table[i][0] < event.end:
-    #         if self.current_time < self.scheduled_doze_table[i][1]:
-    #             concerned_doze.append(self.scheduled_doze_table[i])
-    #         i+=1
-    #     for doze in concerned_doze:
-    #         self.CCA_busy_until(max(self.current_time, doze[0]))
-    #         self.doze_until(min(doze[1], event.end))
-    #     self.CCA_busy_until(event.end)
-
 
             
 ## SCHEDULES DOZE PERIODS
@@ -150,20 +135,12 @@ class Card_state:
         self.wakeup_time = wakeup_time
         # self.add_scheduled_doze((self.current_time - 1, wakeup_time))
             
-    # def add_scheduled_doze(self, scheduled_doze):
-    #     assert(scheduled_doze[0] < scheduled_doze[1])
-    #     assert(scheduled_doze[1] - scheduled_doze[0] > MIN_DOZE_DURATION)
-    #     self.scheduled_doze_table.add(scheduled_doze)
 
     def is_dozing(self, time):
         if self.DL_slot is None:
             return time < self.wakeup_time
         else:
             return not self.DL_slot.is_in_SP(time)
-        # for doze in self.scheduled_doze_table:
-        #     if doze[0] <= time and time < doze[1]:
-        #         return True
-        # return False
 
     def clear_scheduled_doze(self):
         self.scheduled_doze_table.clear()
@@ -174,7 +151,7 @@ class Card_state:
             
     def doze_until(self, time):
         assert(self.current_time <= time)
-        self.doze += (time - self.current_time)
+        self.doze += time - self.current_time
         if DEBUG:
             self.timeline.add_until(time, 'z')
         self.current_time = time
@@ -248,53 +225,24 @@ class Card_state:
             print(f"{Style.RESET_ALL}", end="")
             result = False
 
-        if abs(self.current_time - (self.Rx + self.Tx + self.CCA_busy + self.idle + self.doze)) > 10**-9:
+        add = self.Rx + self.Tx + self.CCA_busy + self.idle + self.doze
+        if self.current_time != add:
             print(f"{Fore.RED}Card State: ERROR state counters do not match current time")
+            print("Current time:", self.current_time.s, "s", self.current_time.ms, "ms", self.current_time.us, "us")
+            print("State addition:", add.s, "s", add.ms, "ms", add.us, "us")
             print(f"{Style.RESET_ALL}", end="")
             result = False
             
-        if not result:
-            print(self.get_dictionary())
-
         assert(result)
-
-
-    def verify_scheduled_doze(self):
-        # Scheduled_doze_table must be ordonned
-        for i in range(len(self.scheduled_doze_table)):
-            doze_tuple = self.scheduled_doze_table[i]
-            if not doze_tuple[0] < doze_tuple[1]:
-                print(f"{Fore.RED}Wakeup should come after doze, and not before.")
-                print("Doze tuple:", doze_tuple)
-                print("self.scheduled_doze_table:", self.scheduled_doze_table)
-                print(f"{Style.RESET_ALL}", end="")
-                return False
-            if not doze_tuple[1] - doze_tuple[0] > MIN_DOZE_DURATION:
-                print(f"{Fore.RED}Doze duration lesser than MIN_DOZE_DURATION")
-                print("Doze tuple:", doze_tuple)
-                print("self.scheduled_doze_table:", self.scheduled_doze_table)
-                print(f"{Style.RESET_ALL}", end="")
-                return False
-            
-            for j in range(i+1, len(self.scheduled_doze_table)):
-                doze_tuple_i = self.scheduled_doze_table[i]
-                doze_tuple_j = self.scheduled_doze_table[j]
-                if not doze_tuple_i[1] < doze_tuple_j[0]:
-                    print(f"{Fore.RED}self.scheduled_doze_table is not ordonned")
-                    print("Doze tuples:", doze_tuple_i, ", ", doze_tuple_j)
-                    print("self.scheduled_doze_table:", self.scheduled_doze_table)
-                    print(f"{Style.RESET_ALL}", end="")
-                    return False
-        return True
 
         
     def get_dictionary(self):
         result = {
             "STA_ID": self.STA_ID,
-            "Rx": self.Rx,
-            "Tx": self.Tx,
-            "CCA_busy": self.CCA_busy,
-            "idle": self.idle,
-            "doze": self.doze
+            "Rx": float(self.Rx),
+            "Tx": float(self.Tx),
+            "CCA_busy": float(self.CCA_busy),
+            "idle": float(self.idle),
+            "doze": float(self.doze)
         }
         return result

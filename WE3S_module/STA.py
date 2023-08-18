@@ -1,6 +1,6 @@
-from contender import *
-from frame_generator import *
-from stream_handler import *
+from WE3S.contender import *
+from WE3S.frame_generator import *
+from WE3S.stream_handler import *
 
 class STA (Contender):
 
@@ -9,13 +9,13 @@ class STA (Contender):
 
         # Max size for MAC frame: 2048 bytes
         self.UL_frame_generator = Frame_generator(throughput = 2 * 10**6,
-                                                  frame_length = 1440*8,
+                                                  frame_size = 1440*8,
                                                   sender_ID = self.ID,
                                                   destination_ID = 0,
                                                   label = "UL Tx")
 
         self.DL_frame_generator = Frame_generator(throughput = 2 * 10**6,
-                                                  frame_length = 1440*8,
+                                                  frame_size = 1440*8,
                                                   sender_ID = 0,
                                                   destination_ID = self.ID,
                                                   label = "DL Tx")
@@ -29,7 +29,7 @@ class STA (Contender):
         self.UL_slot = None
         self.received_UL_prompt = None
 
-        self.buffer_capacity = STA_BUFFER_SIZE
+        self.buffer_capacity = STA_BUFFER_CAPACITY
 
         self.wlan.add_STA()
 
@@ -40,11 +40,19 @@ class STA (Contender):
         self.DL_frame_generator.set_throughput(throughput)
         self.DL_frame_generator.is_interval_random = is_interval_random
 
+    def set_DL_frame_size(self, frame_size):
+        assert(frame_size > 0)
+        self.DL_frame_generator.set_frame_size(frame_size)
+
     def set_UL_throughput(self, throughput, is_interval_random):
         assert(throughput > 0)
         self.UL_frame_generator.set_throughput(throughput)
         self.UL_frame_generator.is_interval_random = is_interval_random
 
+    def set_UL_frame_size(self, frame_size):
+        assert(frame_size > 0)
+        self.UL_frame_generator.set_frame_size(frame_size)
+        
     def use_DL_slot(self):
         return self.DL_slot is not None
 
@@ -147,10 +155,9 @@ class STA (Contender):
             return None
         event_duration = self.create_event_duration(stream)
         event_frames = stream.get_frames()[:MAX_AGGREGATED_FRAMES]
-        event = Event(event_start, event_duration, None)
-        event.frames = event_frames.copy()
+        event = Event(event_start, event_duration, event_frames.copy())
         return event
-        
+
 
     def create_event_start(self, stream):
         if self.use_UL_prompt():
@@ -159,17 +166,17 @@ class STA (Contender):
             return None
         else:
             event_start = stream.get_transmission_time(self.backoff)
-            return max(event_start, self.current_time + DIFS + self.backoff * BACKOFF_SLOT)
+            return max(event_start, float(self.current_time + DIFS + self.backoff * BACKOFF_SLOT))
 
     def create_event_duration(self, stream):
         data_rate = self.wlan.get_link_capacity(self.ID)
         frame_table = stream.get_frames()[:MAX_AGGREGATED_FRAMES]
         is_ACK = len(frame_table) == 1 and frame_table[0].label == "ACK"
-        total_size = sum([frame.length for frame in frame_table])
+        total_size = sum([frame.size for frame in frame_table])
         total_size += MAC_HEADER_SIZE
         if not is_ACK:
             total_size += ACK_SIZE
-        event_duration = total_size / data_rate
+        event_duration = Timestamp(total_size / data_rate)
         event_duration += PHY_HEADER_DURATION
         if not is_ACK:
             event_duration += ACK_DURATION
@@ -207,39 +214,8 @@ class STA (Contender):
             transmission_time = self.UL_data_stream.get_transmission_time(self.backoff)
             if transmission_time ==-1:
                 return
-            if transmission_time - SWITCH_DURATION - self.current_time > MIN_DOZE_DURATION:
-                self.state_counter.switch_to_doze_state(transmission_time - SWITCH_DURATION)
-        # if self.use_DL_slot():
-        #     transmission_time = self.UL_data_stream.get_transmission_time(self.backoff)
-        #     if transmission_time is None:
-        #         stop = self.current_time + MAX_NO_EVENT_PERIOD
-        #         self.schedule_doze_period_until(stop)
-        #     elif transmission_time == -1:
-        #         return
-        #     elif transmission_time > self.current_time:
-        #         stop = transmission_time
-        #         self.schedule_doze_period_until(stop)
-        #     else:
-        #         print(f"{Fore.RED}Transmission time cannot be out these 3 options.")
-        #         print("Transmission time:", transmission_time)
-        #         print("Current time:", self.current_time)
-        #         print(f"{Style.RESET_ALL}")
-        #         assert(0)
-
-    # def schedule_doze_period_until(self, stop):
-    #     assert(self.use_DL_slot())
-    #     time_increment = self.current_time
-    #     if not self.DL_slot.is_in_SP(time_increment):
-    #         doze_period_end = self.DL_slot.get_next_SP_start(time_increment) - SWITCH_DURATION
-    #         if doze_period_end - self.current_time - SWITCH_DURATION > MIN_DOZE_DURATION:
-    #             self.state_counter.switch_to_doze_state(doze_period_end)
-    #         time_increment = self.DL_slot.get_next_SP_start(time_increment) + SWITCH_DURATION
-    #     while time_increment < stop:
-    #         doze_period_start = self.DL_slot.get_current_SP_end(time_increment)
-    #         doze_period_end = self.DL_slot.get_next_SP_start(time_increment)
-    #         if doze_period_end - doze_period_start > MIN_DOZE_DURATION:
-    #             self.state_counter.add_scheduled_doze((doze_period_start, doze_period_end))
-    #         time_increment = self.DL_slot.get_next_SP_start(time_increment) + SWITCH_DURATION
+            if Timestamp(transmission_time) - self.current_time > MIN_DOZE_DURATION:
+                self.state_counter.switch_to_doze_state(Timestamp(transmission_time))
 
 
     def verify_strategy_use(self, event):
@@ -273,7 +249,7 @@ class STA (Contender):
         if event.is_collision():
             return
         if event.is_sender(self.ID):
-            for frame in event.frames.copy():
+            for frame in event.frame_table.copy():
                 if not frame.is_in_error:
                     assert(frame.sender_ID == self.ID)
                     if frame.label == "UL Tx":
@@ -303,7 +279,7 @@ class STA (Contender):
             assert(event.is_receiver(self.ID))
             if event.is_EOSP():
                 self.wait_for_DL_prompt_answer = False
-            elif len(event.frames) == 1 and event.frames[0].label == "ACK":
+            elif len(event.frame_table) == 1 and event.frame_table[0].label == "ACK":
                 self.wait_for_DL_prompt_answer = False
                         
     def update_scheduled_to_pending(self):
@@ -319,13 +295,13 @@ class STA (Contender):
                 self.DL_prompt_stream.buffer_scheduled_frame()
 
     def get_number_of_pending_frames(self):
-        return self.UL_data_stream.get_buffer_size()
+        return self.UL_data_stream.get_number_of_pending_frames()
 
     def react_to_UL_prompts(self, event):
         if not self.use_UL_prompt():
             return
         if not event.is_collision():
-            if len(event.frames) == 1 and event.frames[0].label == "UL prompt" and not event.is_error():
+            if len(event.frame_table) == 1 and event.frame_table[0].label == "UL prompt" and not event.is_error():
                 if event.is_receiver(self.ID):
                     self.received_UL_prompt = True
 
@@ -371,9 +347,9 @@ class STA (Contender):
     def get_dictionary(self):
         result = {
             "ID": self.ID,
-            "UL_traffic": self.UL_frame_generator.get_dictionary(),
-            "DL_traffic": self.DL_frame_generator.get_dictionary(),
-            "Link capacity": self.wlan.get_link_capacity(self.ID),
+            "UL traffic": self.UL_frame_generator.get_dictionary(),
+            "DL traffic": self.DL_frame_generator.get_dictionary(),
+            "Datarate": self.wlan.get_link_capacity(self.ID),
             "use DL slot": self.use_DL_slot(),
             "use DL prompt": self.use_DL_prompt(),
             "use UL slot": self.use_UL_slot(),

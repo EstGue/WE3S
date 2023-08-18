@@ -1,8 +1,8 @@
 import random
 
-from common_parameters import *
-from card_state import *
-from WLAN import *
+from WE3S.common_parameters import *
+from WE3S.card_state import *
+from WE3S.WLAN import *
 
 wlan = WLAN()
 
@@ -13,7 +13,7 @@ class Contender:
         self.wlan = wlan
         
         self.ID = ID
-        self.current_time = 0
+        self.current_time = Timestamp(0)
         
         self.backoff = 0
         self.contention_window = MIN_CONTENTION_WINDOW
