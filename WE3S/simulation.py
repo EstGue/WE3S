@@ -72,11 +72,10 @@ class Simulation():
         assert(first_start < interval)
         self.event_handler.toggle_UL_slot(STA_ID, first_start, duration, interval)
 
-    def toggle_UL_prompt(self, STA_ID, prompt_interval):
+    def toggle_UL_prompt(self, STA_ID, strategy_name, arg_dict):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
-        assert(prompt_interval > 0)
-        self.event_handler.toggle_UL_prompt(STA_ID, prompt_interval)
-    
+        self.event_handler.toggle_UL_prompt(STA_ID, strategy_name, arg_dict)
+
     def deactivate_random_error_on_frame(self):
         self.event_handler.deactivate_random_error_on_frame()
 
@@ -110,8 +109,9 @@ class Simulation():
                 interval = sta_dict["UL slot"]["Interval"]
                 self.toggle_UL_slot(STA_ID, start, duration, interval)
             if sta_dict["Use UL prompt"]:
-                interval = sta_dict["UL prompt"]["Interval"]
-                self.toggle_UL_prompt(STA_ID, interval)
+                strategy_name = sta_dict["UL prompt"]["Strategy name"]
+                arg_dict = sta_dict["UL prompt"]
+                self.toggle_UL_prompt(STA_ID, strategy_name, arg_dict)
         if not spec_dict["Random channel error"]:
             self.deactivate_channel_error()
         self.set_buffer_capacity_AP(spec_dict["AP buffer capacity"])

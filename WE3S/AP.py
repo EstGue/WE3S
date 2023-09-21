@@ -13,7 +13,8 @@ class AP(Contender):
 
         self.received_DL_prompt = -1
         self.sent_UL_prompt = -1
-
+        self.UL_prompt_answer = []
+        
 
 ### INITIALIZATION and related functions
 
@@ -57,10 +58,12 @@ class AP(Contender):
     def toggle_UL_slot(self, STA_ID, UL_slot):
         self.stream_information[str(STA_ID)]["use UL slot"] = True
 
-    def toggle_UL_prompt(self, STA_ID, prompt_interval):
+    def toggle_UL_prompt(self, STA_ID, strategy_name, arg_dict):
         self.stream_information[str(STA_ID)]["use UL prompt"] = True
         len_stream = len(self.stream_table)
-        self.stream_table.append(Prompt_stream(prompt_interval, 0, STA_ID, "UL prompt"))
+        prompt_stream = Prompt_stream(0, STA_ID, "UL prompt")
+        prompt_stream.set_strategy(strategy_name, arg_dict)
+        self.stream_table.append(prompt_stream)
         self.stream_information[str(STA_ID)]["UL prompt index"] = len_stream
         if self.stream_information[str(STA_ID)]["use DL slot"]:
             datastream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
@@ -303,9 +306,13 @@ class AP(Contender):
 
     def update_UL_prompt_answer(self, event):
         if self.sent_UL_prompt != -1:
+            self.UL_prompt_answer += event.frame_table
             for frame in event.frame_table:
                 assert(frame.sender_ID == self.sent_UL_prompt or frame.has_collided)
             if event.is_EOSP:
+                stream_index = self.stream_information[str(self.sent_UL_prompt)]["UL prompt index"]
+                self.stream_table[stream_index].set_prompt_answer(self.UL_prompt_answer)
+                self.UL_prompt_answer = []
                 self.sent_UL_prompt = -1
                 
     def update_stream_time(self):

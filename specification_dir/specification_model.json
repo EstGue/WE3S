@@ -16,9 +16,9 @@
 	    },
 	    "Buffer capacity": 20,
 	    "Use DL slot": false,
-	    "Use DL prompt": true,
+	    "Use DL prompt": false,
 	    "Use UL slot": false,
-	    "Use UL prompt": false,
+	    "Use UL prompt": true,
 	    "DL slot": {
 		"Start": 0,
 		"Duration": 0.05,
@@ -34,7 +34,8 @@
 		"Interval": 0.1
 	    },
 	    "UL prompt": {
-		"Interval": 0.001
+		"Strategy name": "None",
+		"Prompt interval": 0.001
 	    }
 	},
 	"2": {

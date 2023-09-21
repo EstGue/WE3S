@@ -93,11 +93,10 @@ class Event_handler:
         UL_slot = Slot(STA_ID, first_start, duration, interval)
         self.contenders[STA_ID].toggle_UL_slot(UL_slot)
 
-    def toggle_UL_prompt(self, STA_ID, prompt_interval):
+    def toggle_UL_prompt(self, STA_ID, strategy_name, arg_dict):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        assert(prompt_interval > 0)
         self.contenders[STA_ID].toggle_UL_prompt()
-        self.contenders[0].toggle_UL_prompt(STA_ID, prompt_interval)
+        self.contenders[0].toggle_UL_prompt(STA_ID, strategy_name, arg_dict)
 
 
     def deactivate_random_error_on_frame(self):
