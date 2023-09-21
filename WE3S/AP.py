@@ -49,7 +49,7 @@ class AP(Contender):
             UL_prompt_stream_index = self.stream_information[str(STA_ID)]["UL prompt index"]
             self.stream_table[UL_prompt_stream_index].toggle_slot(DL_slot)
 
-    def toggle_DL_prompt(self, STA_ID, prompt_interval):
+    def toggle_DL_prompt(self, STA_ID):
         self.stream_information[str(STA_ID)]["use DL prompt"] = True
         datastream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
         self.stream_table[datastream_index].toggle_prompt()

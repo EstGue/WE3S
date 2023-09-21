@@ -81,11 +81,10 @@ class Event_handler:
         self.contenders[STA_ID].toggle_DL_slot(DL_slot)
         self.contenders[0].toggle_DL_slot(STA_ID, DL_slot)
 
-    def toggle_DL_prompt(self, STA_ID, prompt_interval):
+    def toggle_DL_prompt(self, STA_ID, strategy_name, arg_dict):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        assert(prompt_interval > 0)
-        self.contenders[STA_ID].toggle_DL_prompt(prompt_interval)
-        self.contenders[0].toggle_DL_prompt(STA_ID, prompt_interval)
+        self.contenders[STA_ID].toggle_DL_prompt(strategy_name, arg_dict)
+        self.contenders[0].toggle_DL_prompt(STA_ID)
 
     def toggle_UL_slot(self, STA_ID, first_start, duration, interval):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))

@@ -3,6 +3,7 @@ from colorama import Style
 
 from WE3S.frame_generator import *
 from WE3S.common_parameters import *
+from WE3S.prompt_strategy import *
 
 class Stream:
 
@@ -190,7 +191,7 @@ class Stream:
                 result_final = False
         assert(result_final)
 
-        
+
 class Data_stream(Stream):
 
     def __init__(self, frame_generator):
@@ -201,18 +202,43 @@ class Data_stream(Stream):
 
 class Prompt_stream(Stream):
 
-    def __init__(self, prompt_interval, sender_ID, destination_ID, label):
+    def __init__(self, sender_ID, destination_ID, label):
         Stream.__init__(self)
 
-        assert(prompt_interval > 0)
-        self.prompt_interval = prompt_interval
         self.sender_ID = sender_ID
         self.destination_ID = destination_ID
         self.label = label
 
+        self.prompt_strategy = None
+
     def initialize(self):
-        creation_time = (random.randint(10, 100) / 100) * self.prompt_interval
-        self.scheduled_frame = self.create_frame(creation_time)
+        self.load_next_scheduled_frame()
+
+    def set_strategy(self, strategy_name, arg_dict):
+        if strategy_name == "None":
+            self.prompt_strategy = Prompt_strategy_None(arg_dict["Prompt interval"])
+        elif strategy_name == "TCP-like":
+            self.prompt_strategy = Prompt_strategy_TCP_like(arg_dict["Min prompt interval"],
+                                                            arg_dict["Max prompt interval"],
+                                                            arg_dict["Prompt interval incrementation step"],
+                                                            arg_dict["Objective nb returned frames"],
+                                                            arg_dict["Max nb returned frames"])
+        else:
+            print(f"{Fore.RED}This prompt strategy does not exist.")
+            print("Must be in: None, TCP-like")
+            print("Is:", strategy_name)
+            print(f"{Style.RESET_ALL}")
+            assert(0)
+        
+    def get_transmission_time_raw(self):
+         if len(self.pending_frame_table) == 0 and self.scheduled_frame is None:
+             return None
+         return Stream.get_transmission_time_raw(self)
+
+    def get_transmission_time_slot(self, backoff):
+         if len(self.pending_frame_table) == 0 and self.scheduled_frame is None:
+             return None
+         return Stream.get_transmission_time_slot(self, backoff)
 
     def get_destination_ID(self):
         return self.destination_ID
@@ -225,18 +251,21 @@ class Prompt_stream(Stream):
         for frame in self.pending_frame_table:
             if frame.ID == frame_ID:
                 self.pending_frame_table.remove(frame)
-                self.load_next_scheduled_frame()
                 return
         if frame_ID == self.scheduled_frame.ID:
-            self.load_next_scheduled_frame()
+            self.scheduled_frame = None
             return
         else:
             print(f"{Fore.RED}The frame does not belong to this stream")
             print(frame.get_dictionary(), f"Style.RESET_ALL")
             assert(0)
 
+    def set_prompt_answer(self, complete_frame_table):
+        self.prompt_strategy.update_prompt_answer(complete_frame_table)
+        self.load_next_scheduled_frame()
+
     def load_next_scheduled_frame(self):
-        creation_time = self.current_time + self.prompt_interval
+        creation_time = self.current_time + self.prompt_strategy.get_next_prompt_interval()
         self.scheduled_frame = self.create_frame(creation_time)
 
     def is_up_to_date(self):
@@ -244,14 +273,14 @@ class Prompt_stream(Stream):
             return True
         else:
             return Stream.is_up_to_date(self)
-            
+
     def verify_inner_state(self):
         if len(self.pending_frame_table) == 1:
             assert(self.scheduled_frame is None)
             assert(self.pending_frame_table[0].creation_time <= self.current_time)
-        if len(self.pending_frame_table) == 0:
-            assert(self.scheduled_frame is not None)
-            assert(self.scheduled_frame.creation_time > self.current_time)
+        if self.prompt_strategy is None:
+            print(f"{Fore.RED}No prompt strategy has been set. Please do so using the set_strategy() function.{Style.RESET_ALL}")
+            assert(0)
         if len(self.pending_frame_table) > 1:
             print(f"{Fore.RED}There can be no more than one prompt at a time")
             print("Number of prompts:", len(self.pending_frame_table))

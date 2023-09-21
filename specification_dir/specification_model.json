@@ -15,8 +15,8 @@
 		"Random interval": true
 	    },
 	    "Buffer capacity": 20,
-	    "Use DL slot": true,
-	    "Use DL prompt": false,
+	    "Use DL slot": false,
+	    "Use DL prompt": true,
 	    "Use UL slot": false,
 	    "Use UL prompt": false,
 	    "DL slot": {
@@ -25,7 +25,8 @@
 		"Interval": 0.1
 	    },
 	    "DL prompt": {
-		"Interval": 0.001
+		"Strategy name": "None",
+		"Prompt interval": 0.02
 	    },
 	    "UL slot": {
 		"Start": 0,
@@ -37,7 +38,7 @@
 	    }
 	},
 	"2": {
-	    "Datarate": 5,
+	    "Datarate": 100000000,
 	    "DL traffic": {
 		"Workload": 5000000,
 		"Frame size": 11520,
@@ -50,7 +51,7 @@
 	    },
 	    "Buffer capacity": 20,
 	    "Use DL slot": false,
-	    "Use DL prompt": false,
+	    "Use DL prompt": true,
 	    "Use UL slot": false,
 	    "Use UL prompt": false,
 	    "DL slot": {
@@ -59,7 +60,12 @@
 		"Interval": 0.1
 	    },
 	    "DL prompt": {
-		"Interval": 0.001
+		"Strategy name": "TCP-like",
+		"Min prompt interval": 0.001,
+		"Max prompt interval": 10,
+		"Prompt interval incrementation step": 0.001,
+		"Objective nb returned frames": 5,
+		"Max nb returned frames": 20
 	    },
 	    "UL slot": {
 		"Start": 0.05,

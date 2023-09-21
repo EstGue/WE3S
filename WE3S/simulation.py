@@ -62,10 +62,9 @@ class Simulation():
         assert(first_start < interval)
         self.event_handler.toggle_DL_slot(STA_ID, first_start, duration, interval)
 
-    def toggle_DL_prompt(self, STA_ID, prompt_interval):
+    def toggle_DL_prompt(self, STA_ID, strategy_name, arg_dict):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
-        assert(prompt_interval > 0)
-        self.event_handler.toggle_DL_prompt(STA_ID, prompt_interval)
+        self.event_handler.toggle_DL_prompt(STA_ID, strategy_name, arg_dict)
 
     def toggle_UL_slot(self, STA_ID, first_start, duration, interval):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
@@ -102,8 +101,9 @@ class Simulation():
                 interval = sta_dict["DL slot"]["Interval"]
                 self.toggle_DL_slot(STA_ID, start, duration, interval)
             if sta_dict["Use DL prompt"]:
-                interval = sta_dict["DL prompt"]["Interval"]
-                self.toggle_DL_prompt(STA_ID, interval)
+                strategy_name = sta_dict["DL prompt"]["Strategy name"]
+                arg_dict = sta_dict["DL prompt"]
+                self.toggle_DL_prompt(STA_ID, strategy_name, arg_dict)
             if sta_dict["Use UL slot"]:
                 start = sta_dict["UL slot"]["Start"]
                 duration = sta_dict["UL slot"]["Duration"]

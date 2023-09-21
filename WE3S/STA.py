@@ -22,9 +22,9 @@ class STA (Contender):
 
         self.UL_data_stream = Data_stream(self.UL_frame_generator)
         self.DL_prompt_stream = None
+        self.DL_prompt_answer = []
 
         self.DL_slot = None
-        self.DL_prompt_interval = None
         self.wait_for_DL_prompt_answer = None
         self.UL_slot = None
         self.received_UL_prompt = None
@@ -57,7 +57,7 @@ class STA (Contender):
         return self.DL_slot is not None
 
     def use_DL_prompt(self):
-        return self.DL_prompt_interval is not None
+        return self.DL_prompt_stream is not None
 
     def use_UL_slot(self):
         return self.UL_slot is not None
@@ -70,11 +70,11 @@ class STA (Contender):
         self.DL_slot = DL_slot
         self.state_counter.toggle_DL_slot(DL_slot)
 
-    def toggle_DL_prompt(self, DL_prompt_interval):
+    def toggle_DL_prompt(self, strategy_name, arg_dict):
         assert(not self.use_DL_slot())
         assert(not self.use_UL_prompt())
-        self.DL_prompt_interval = DL_prompt_interval
-        self.DL_prompt_stream = Prompt_stream(DL_prompt_interval, self.ID, 0, "DL prompt")
+        self.DL_prompt_stream = Prompt_stream(self.ID, 0, "DL prompt")
+        self.DL_prompt_stream.set_strategy(strategy_name, arg_dict)
         self.wait_for_DL_prompt_answer = False
         if self.use_UL_slot():
             self.DL_prompt_stream.toggle_slot(self.UL_slot)
@@ -138,10 +138,15 @@ class STA (Contender):
             else:
                 return None
         if self.use_DL_prompt():
-            # Chooses the oldest stream between UL_data_stream and DL_prompt_stream
-            if self.DL_prompt_stream.get_transmission_time(self.backoff) is None:
-                assert(self.UL_data_stream.get_transmission_time(self.backoff) is None)
+            # If one stream cannot transmit, then the other is selected
+            if self.DL_prompt_stream.get_transmission_time(self.backoff) is None \
+               and self.UL_data_stream.get_transmission_time(self.backoff) is None:
                 return None
+            elif self.DL_prompt_stream.get_transmission_time(self.backoff) is None:
+                return self.UL_data_stream
+            elif self.UL_data_stream.get_transmission_time(self.backoff) is None:
+                return DL_prompt_stream
+            # Chooses the oldest stream between UL_data_stream and DL_prompt_stream
             DL_prompt_creation_time = self.DL_prompt_stream.get_oldest_creation_time()
             UL_data_creation_time = self.UL_data_stream.get_oldest_creation_time()
             if DL_prompt_creation_time < UL_data_creation_time:
@@ -277,10 +282,15 @@ class STA (Contender):
                 print(f"{Style.RESET_ALL}")
                 assert(0)
             assert(event.is_receiver(self.ID))
+            self.DL_prompt_answer += event.frame_table
             if event.is_EOSP():
                 self.wait_for_DL_prompt_answer = False
+                self.DL_prompt_stream.set_prompt_answer(self.DL_prompt_answer.copy())
+                self.DL_prompt_answer = []
             elif len(event.frame_table) == 1 and event.frame_table[0].label == "ACK":
                 self.wait_for_DL_prompt_answer = False
+                self.DL_prompt_answer = []
+                self.DL_prompt_stream.set_prompt_answer(self.DL_prompt_answer.copy())
                         
     def update_scheduled_to_pending(self):
         self.UL_data_stream.update_time(self.current_time)
@@ -358,7 +368,7 @@ class STA (Contender):
         if self.use_DL_slot():
             result["DL slot"] = self.DL_slot.get_dictionary()
         if self.use_DL_prompt():
-            result["DL prompt interval"] = self.DL_prompt_interval
+            result["DL prompt"] = self.DL_prompt_stream.prompt_strategy.get_dictionary()
         if self.use_UL_slot():
             result["UL slot"] = self.UL_slot.get_dictionary()
         result["counters"] = self.state_counter.get_dictionary()
