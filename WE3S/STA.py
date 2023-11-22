@@ -7,20 +7,7 @@ class STA (Contender):
     def __init__(self, ID):
         Contender.__init__(self, ID)
 
-        # Max size for MAC frame: 2048 bytes
-        self.UL_frame_generator = Frame_generator(throughput = 2 * 10**6,
-                                                  frame_size = 1440*8,
-                                                  sender_ID = self.ID,
-                                                  destination_ID = 0,
-                                                  label = "UL Tx")
-
-        self.DL_frame_generator = Frame_generator(throughput = 2 * 10**6,
-                                                  frame_size = 1440*8,
-                                                  sender_ID = 0,
-                                                  destination_ID = self.ID,
-                                                  label = "DL Tx")
-
-        self.UL_data_stream = Data_stream(self.UL_frame_generator)
+        self.UL_data_stream = Data_stream(None)
         self.DL_prompt_stream = None
         self.DL_prompt_answer = []
 
@@ -35,23 +22,8 @@ class STA (Contender):
 
 ### INITIALIZATION and related functions
 
-    def set_DL_throughput(self, throughput, is_interval_random):
-        assert(throughput > 0)
-        self.DL_frame_generator.set_throughput(throughput)
-        self.DL_frame_generator.is_interval_random = is_interval_random
-
-    def set_DL_frame_size(self, frame_size):
-        assert(frame_size > 0)
-        self.DL_frame_generator.set_frame_size(frame_size)
-
-    def set_UL_throughput(self, throughput, is_interval_random):
-        assert(throughput > 0)
-        self.UL_frame_generator.set_throughput(throughput)
-        self.UL_frame_generator.is_interval_random = is_interval_random
-
-    def set_UL_frame_size(self, frame_size):
-        assert(frame_size > 0)
-        self.UL_frame_generator.set_frame_size(frame_size)
+    def set_UL_traffic(self, traffic_type, arg_dict):
+        self.UL_data_stream.set_traffic(self.ID, 0, "UL Tx", traffic_type, arg_dict)
         
     def use_DL_slot(self):
         return self.DL_slot is not None
@@ -257,11 +229,7 @@ class STA (Contender):
             for frame in event.frame_table.copy():
                 if not frame.is_in_error:
                     assert(frame.sender_ID == self.ID)
-                    if frame.label == "UL Tx":
-                        self.UL_data_stream.remove_frame(frame.ID)
-                        if self.use_UL_prompt() and not self.UL_data_stream.is_pending():
-                            self.received_UL_prompt = False
-                    elif frame.label == "DL prompt":
+                    if frame.label == "DL prompt":
                         assert(self.use_DL_prompt())
                         self.wait_for_DL_prompt_answer = True
                         self.DL_prompt_stream.remove_frame(frame.ID)
@@ -269,10 +237,13 @@ class STA (Contender):
                         assert(self.use_UL_prompt())
                         self.received_UL_prompt = False
                     else:
-                        print(f"{Fore.RED}The STA is not supposed to send a frame different from UL Tx, DL prompt or ACK")
-                        print("Frame:", frame.get_dictionary())
-                        print(f"{Style.RESET_ALL}")
-                        assert(0)
+                        self.UL_data_stream.remove_frame(frame.ID)
+                        if self.use_UL_prompt() and not self.UL_data_stream.is_pending():
+                            self.received_UL_prompt = False
+                        # print(f"{Fore.RED}The STA is not supposed to send a frame different from UL Tx, DL prompt or ACK")
+                        # print("Frame:", frame.get_dictionary())
+                        # print(f"{Style.RESET_ALL}")
+                        # assert(0)
 
     def react_to_DL_prompt_answer(self, event):
         if self.wait_for_DL_prompt_answer:
@@ -357,8 +328,7 @@ class STA (Contender):
     def get_dictionary(self):
         result = {
             "ID": self.ID,
-            "UL traffic": self.UL_frame_generator.get_dictionary(),
-            "DL traffic": self.DL_frame_generator.get_dictionary(),
+            "UL traffic": self.UL_data_stream.get_dictionary(),
             "Datarate": self.wlan.get_link_capacity(self.ID),
             "use DL slot": self.use_DL_slot(),
             "use DL prompt": self.use_DL_prompt(),

@@ -14,14 +14,13 @@ class AP(Contender):
         self.received_DL_prompt = -1
         self.sent_UL_prompt = -1
         self.UL_prompt_answer = []
-        
+
 
 ### INITIALIZATION and related functions
 
     def add_STA(self, sta):
         datastream_index = len(self.stream_table)
-        if sta.DL_frame_generator is not None:
-            self.stream_table.append(Data_stream(sta.DL_frame_generator))
+        self.stream_table.append(Data_stream(None))
         self.stream_information[str(sta.ID)] = dict()
         self.stream_information[str(sta.ID)]["DL Tx index"] = datastream_index
         self.stream_information[str(sta.ID)]["use DL slot"] = False
@@ -41,6 +40,10 @@ class AP(Contender):
             prompt_stream_index = len(self.stream_table)
             self.stream_table.append(Prompt_stream(sta.UL_prompt_interval, 0, sta.ID, "UL prompt"))
             self.stream_information[str(sta.ID)]["UL prompt index"] = prompt_stream_index
+
+    def set_DL_traffic(self, STA_ID, traffic_type, arg_dict):
+        stream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
+        self.stream_table[stream_index].set_traffic(0, STA_ID, "DL Tx", traffic_type, arg_dict)
 
     def toggle_DL_slot(self, STA_ID, DL_slot):
         self.stream_information[str(STA_ID)]["use DL slot"] = True
@@ -79,7 +82,7 @@ class AP(Contender):
     def verify_initialization(self):
         for sta in self.stream_information:
             datastream_index = self.stream_information[sta]["DL Tx index"]
-            assert(self.stream_table[datastream_index].get_destination_ID() == int(sta))
+            assert(self.stream_table[datastream_index].get_receiver_ID() == int(sta))
             use_DL_slot = self.stream_information[sta]["use DL slot"]
             use_DL_prompt = self.stream_information[sta]["use DL prompt"]
             use_UL_slot = self.stream_information[sta]["use UL slot"]
@@ -96,9 +99,8 @@ class AP(Contender):
             if use_UL_prompt:
                 assert(not use_UL_slot)
                 assert(not use_DL_prompt)
-                UL_prompt_index = self.stream_information[sta]["UL prompt index"]
-                assert(self.stream_table[UL_prompt_index].get_destination_ID() == int(sta))
-                
+                assert("UL prompt index" in self.stream_information[sta])
+
 ### GET NEXT EVENT and related functions
 
     def get_next_event(self, current_time):
@@ -226,7 +228,7 @@ class AP(Contender):
                 return result
 
     def create_event_duration(self, stream):
-        data_rate = self.wlan.get_link_capacity(stream.get_destination_ID())
+        data_rate = self.wlan.get_link_capacity(stream.get_receiver_ID())
         frame_table = stream.get_frames()[:MAX_AGGREGATED_FRAMES]
         is_ACK = len(frame_table) == 1 and frame_table[0].label == "ACK"
         total_size = sum([frame.size for frame in frame_table])
@@ -250,8 +252,8 @@ class AP(Contender):
             self.update_timeline(event)
         self.current_time = event.end
         self.update_UL_prompt_answer(event)
-        self.remove_sent_frames(event)
         self.update_received_DL_prompt(event)
+        self.remove_sent_frames(event)
         self.update_stream_time()
         self.update_scheduled_to_pending()
         if event.is_DL_prompt():
@@ -267,36 +269,57 @@ class AP(Contender):
                 self.new_backoff_after_success()        
 
 
-
     def remove_sent_frames(self, event):
-        if not event.is_collision():
-            for frame in event.frame_table.copy():
-                if frame.sender_ID == self.ID and not frame.is_in_error:
-                    stream_index = None
-                    if frame.label == "DL Tx":
-                        stream_index = self.stream_information[str(frame.receiver_ID)]["DL Tx index"]
-                    elif frame.label == "UL prompt":
-                        stream_index = self.stream_information[str(frame.receiver_ID)]["UL prompt index"]
-                        self.sent_UL_prompt = frame.receiver_ID
-                    elif frame.label == "beacon":
-                        stream_index = 0
-                    elif frame.label == "ACK":
-                        pass
-                    else:
-                        print(f"{Fore.RED}No other frame needs to be removed from the AP {Style.RESET_ALL}")
-                        print(frame.get_dictionary())
-                        assert(0)
-                    if stream_index is not None:
+        beacon_removed = self.remove_sent_beacon(event)
+        DL_Tx_removed = self.remove_sent_DL_Tx(event)
+        UL_prompt_removed = self.remove_sent_UL_prompt(event)
+        for frame in event.frame_table:
+            if frame.sender_ID == self.ID:
+                if not frame.has_collided and not frame.is_in_error:
+                    assert(beacon_removed or DL_Tx_removed or UL_prompt_removed or frame.label == "ACK")
+        self.update_active_DL_prompt(event)
+
+    def remove_sent_beacon(self, event):
+        for frame in event.frame_table.copy():
+            if frame.label == "beacon":
+                self.stream_table[0].remove_frame(frame.ID)
+                return True
+        return False
+
+    def remove_sent_DL_Tx(self, event):
+        has_removed_frame = False
+        for frame in event.frame_table.copy():
+            if frame.sender_ID == self.ID:
+                if not frame.has_collided and not frame.is_in_error:
+                    if frame.label != "beacon" and frame.label != "UL prompt" and frame.label != "ACK":
+                        STA_ID = frame.receiver_ID
+                        stream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
                         self.stream_table[stream_index].remove_frame(frame.ID)
-        else:
-        # The beacon is not re-emitted in case of collision or error.
-            for frame in event.frame_table:
-                if frame.label == "beacon":
-                    self.stream_table[0].remove_frame(frame.ID)
+                        has_removed_frame = True
+        return has_removed_frame
+
+
+    def remove_sent_UL_prompt(self, event):
+        has_removed_frame = False
+        for frame in event.frame_table.copy():
+            if frame.sender_ID == self.ID:
+                if not frame.has_collided and not frame.is_in_error:
+                    if frame.label == "UL prompt":
+                        STA_ID = frame.receiver_ID
+                        stream_index = self.stream_information[str(STA_ID)]["UL prompt index"]
+                        self.stream_table[stream_index].remove_frame(frame.ID)
+                        self.sent_UL_prompt = STA_ID
+                        has_removed_frame = True
+        return has_removed_frame
+
+    def update_active_DL_prompt(self, event):
         if self.received_DL_prompt != -1:
             stream_index = self.stream_information[str(self.received_DL_prompt)]["DL Tx index"]
-            if not self.stream_table[stream_index].is_pending():
-                self.received_DL_prompt = -1
+            if event.is_sender(self.ID):
+                if event.is_EOSP() and not event.is_collision() and not event.is_error():
+                    self.received_DL_prompt = -1
+                if len(event.frame_table) == 1 and event.frame_table[0].label == "ACK":
+                    self.received_DL_prompt = -1
 
     def update_received_DL_prompt(self, event):
         if not event.is_collision() and not event.is_error() and event.is_receiver(self.ID):
@@ -389,4 +412,10 @@ class AP(Contender):
             self.timeline[0].add_separation()
 
     def get_dictionary(self):
-        return {"ID": self.ID}
+        result = {"ID": self.ID}
+        DL_traffic_dict = dict()
+        for STA_ID in self.stream_information:
+            stream_index = self.stream_information[STA_ID]["DL Tx index"]
+            DL_traffic_dict[STA_ID] = self.stream_table[stream_index].get_dictionary()
+        result["DL traffic"] = DL_traffic_dict
+        return result

@@ -3,85 +3,158 @@ from numpy import random
 from WE3S.frame import *
 from WE3S.timestamp import *
 
+
+
 class Frame_generator:
-    def __init__(self, throughput, frame_size, sender_ID, destination_ID, label, is_interval_random = True):
+
+    def __init__(self, sender_ID, receiver_ID, label):
         self.sender_ID = sender_ID
-        self.destination_ID = destination_ID
+        self.receiver_ID = receiver_ID
         self.label = label
         self.priority = "LOW"
 
-        self.throughput = throughput
-        self.frame_size = frame_size
-        self.frame_frequency = self.throughput / self.frame_size
-        self.is_interval_random = is_interval_random
-
+        self.next_frame_time = -1
+        self.current_frame = None
         self.frame_counter = 0
-        self.current_frame_time = Timestamp()
-        self.next_frame_time = Timestamp()
-        self.load_next_frame()
-        self.load_next_frame()
+        self.total_generated_data = 0
 
     def get_current_frame_time(self):
-        return self.current_frame_time
+        return self.current_frame.creation_time
 
     def get_next_frame_time(self):
         return self.next_frame_time
-    
-    def load_next_frame(self):
-        self.current_frame_time = self.next_frame_time
-        interval = [0]
-        if self.is_interval_random:
-            interval = random.exponential(1 / self.frame_frequency, size=1)
-        else:
-            interval[0] = 1 / self.frame_frequency
-        assert(interval[0] > 0)
-        self.next_frame_time += interval[0]
-        self.frame_counter += 1
 
     def get_frame(self):
-        frame = Frame(self.current_frame_time, self.sender_ID, self.destination_ID, self.label, self.priority, self.frame_size)
-        return frame
+        return self.current_frame
+
+    def get_sender_ID(self):
+        return self.sender_ID
+
+    def get_receiver_ID(self):
+        return self.receiver_ID
+
+    def load_next_frame(self):
+        self.frame_counter += 1
+        self.total_generated_data += self.current_frame.size
     
-    def get_STA_ID(self):
-        return self.STA_ID
-
-    def get_datasize(self):
-        return self.frame_size
-
-    def set_throughput(self, throughput):
-        self.throughput = throughput
-        self.frame_frequency = self.throughput / self.frame_size
-        self.current_frame_time = Timestamp()
-        self.next_frame_time = Timestamp()
-        self.load_next_frame()
-        self.load_next_frame()
-    
-    def set_frequency(self, frequency):
-        self.frame_frequency = frequency
-        self.throughput = self.frame_size * self.frame_frequency
-        self.current_frame_time = Timestamp()
-        self.next_frame_time = Timestamp()
-        self.load_next_frame()
-        self.load_next_frame()
-
-    def set_frame_size(self, frame_size):
-        # Keeps the thoughput, changes the frame frequency
-        self.frame_size = frame_size
-        self.frequency = self.throughput / self.frame_size
-        self.current_frame_time = Timestamp()
-        self.next_frame_time = Timestamp()
-        self.load_next_frame()
-        self.load_next_frame()
-        
     def get_dictionary(self):
-        result = {
-            "Sender ID" : self.sender_ID,
-            "Destination ID" : self.destination_ID,
-            "Label" : self.label,
-            "Priority" : self.priority,
-            "Throughput": self.throughput,
-            "Frame size": self.frame_size,
-            "Random interval" : self.is_interval_random,
-            "Frame counter" : self.frame_counter
+        return {
+            "Sender ID": self.sender_ID,
+            "Destination ID": self.receiver_ID,
+            "Label": self.label,
+            "Frame counter": self.frame_counter,
+            "Total generated data": self.total_generated_data
         }
+
+
+
+class Constant_frame_generator (Frame_generator):
+
+    def __init__(self, sender_ID, receiver_ID, label, frame_interval, frame_size):
+        Frame_generator.__init__(self, sender_ID, receiver_ID, label)
+        self.frame_interval = frame_interval
+        self.frame_size = frame_size
+        self.load_next_frame()
+
+    def load_next_frame(self):
+        if self.next_frame_time == -1:
+            self.next_frame_time = Timestamp((random.randint(1, 100) / 100) * float(self.frame_interval))
+        frame = Frame(self.next_frame_time, self.sender_ID, self.receiver_ID, self.label, self.priority, self.frame_size)
+        self.current_frame = frame
+        self.next_frame_time += self.frame_interval
+        Frame_generator.load_next_frame(self)
+
+    def get_dictionary(self):
+        result = Frame_generator.get_dictionary(self)
+        result["Frame size"] = self.frame_size
+        result["Frame interval"] = self.frame_interval
+        result["Type"] = "Constant"
         return result
+
+
+
+class Poisson_frame_generator (Frame_generator):
+
+    def __init__(self, sender_ID, receiver_ID, label, frame_interval, frame_size):
+        Frame_generator.__init__(self, sender_ID, receiver_ID, label)
+        self.frame_interval = frame_interval
+        self.frame_size = frame_size
+        self.load_next_frame()
+
+    def load_next_frame(self):
+        if self.next_frame_time == -1:
+            self.next_frame_time = random.exponential(self.frame_interval, size=1)[0]
+        frame = Frame(self.next_frame_time, self.sender_ID, self.receiver_ID, self.label, self.priority, self.frame_size)
+        self.current_frame = frame
+        self.next_frame_time += random.exponential(self.frame_interval, size=1)[0]
+        Frame_generator.load_next_frame(self)
+
+    def get_dictionary(self):
+        result = Frame_generator.get_dictionary(self)
+        result["Frame size"] = self.frame_size
+        result["Frame interval"] = self.frame_interval
+        result["Type"] = "Poisson"
+        return result
+        
+
+
+class Hyperexponential_frame_generator (Frame_generator):
+
+    def __init__(self, sender_ID, receiver_ID, label, frame_size, frame_interval_1, frame_interval_2, probability):
+        Frame_generator.__init__(self, sender_ID, receiver_ID, label)
+        self.frame_size = frame_size
+        self.frame_interval_1 = frame_interval_1
+        self.frame_interval_2 = frame_interval_2
+        self.probability = probability
+        self.load_next_frame()
+
+    def load_next_frame(self):
+        if self.next_frame_time == -1:
+            if random.binomial(size=1, n=1, p=self.probability):
+                self.next_frame_time = random.exponential(self.frame_interval_1, size=1)[0]
+            else:
+                self.next_frame_time = random.exponential(self.frame_interval_2, size=1)[0]
+        frame = Frame(self.next_frame_time, self.sender_ID, self.receiver_ID, self.label, self.priority, self.frame_size)
+        self.current_frame = frame
+        if random.binomial(size=1, n=1, p=self.probability):
+            self.next_frame_time += random.exponential(self.frame_interval_1, size=1)[0]
+        else:
+            self.next_frame_time += random.exponential(self.frame_interval_2, size=1)[0]
+        Frame_generator.load_next_frame(self)
+
+    def get_dictionary(self):
+        result = Frame_generator.get_dictionary(self)
+        result["Frame size"] = self.frame_size
+        result["Frame interval 1"] = self.frame_interval_1
+        result["Frame interval 2"] = self.frame_interval_2
+        result["Probability"] = self.probability
+        result["Type"] = "Hyperexponential"
+        return result
+
+
+class Frame_generator_from_trace_file (Frame_generator):
+
+    def __init__(self, sender_ID, receiver_ID, label, trace_filename):
+        Frame_generator.__init__(self, sender_ID, receiver_ID, label)
+        self.trace_file = open(trace_filename, "r")
+        self.time_offset = 0
+        self.load_next_frame()
+
+    def load_next_frame(self):
+        line = self.trace_file.readline()
+        if len(line) == 0:
+            self.trace_file.seek(0)
+            self.time_offset = self.get_current_frame_time()
+            line = self.trace_file.readline()
+        creation_time = Timestamp(self.time_offset + float(line.split(" ")[0]))
+        size = int(line.split(" ")[1])
+        label = line.split(" ")[2]
+        self.current_frame = Frame(creation_time, self.sender_ID, self.receiver_ID, label, self.priority, size)
+        Frame_generator.load_next_frame(self)
+
+    def get_dictionary(self):
+        result = Frame_generator.get_dictionary(self)
+        result["Type"] = "Trace"
+        return result
+
+

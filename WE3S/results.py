@@ -6,6 +6,7 @@ from .common_parameters import *
 class Results():
     def __init__(self, record_data):
         self.record_data = record_data
+        self.last_key = list(record_data["Events"].keys())[-1]
 
         self.simulation_duration = -1
         self.nb_events = -1
@@ -29,6 +30,10 @@ class Results():
         self.th_tot_throughput_STA = []
         self.th_tot_throughput_avg = -1
         self.th_tot_throughput_std = -1
+
+        self.datarate_STA = []
+        self.datarate_avg = -1
+        self.datarate_std = -1
         
         ## PRACTICAL RESULTS: what really happened in the simulation
         self.busy_time_medium = -1
@@ -144,6 +149,7 @@ class Results():
         self.get_simulation_duration()
         self.get_number_of_events()
         self.get_nb_STAs()
+        self.get_datarate()
 
         self.compute_busy_time()
         self.compute_throughput()
@@ -162,13 +168,19 @@ class Results():
     def get_th_throughput(self):
         if len(self.th_DL_throughput_STA) == 0 or len(self.th_UL_throughput_STA) == 0 or len(self.th_tot_throughput_STA) == 0:
             self.get_nb_STAs()
-            for sta in self.record_data["STAs"]:
-                STA_dict = self.record_data["STAs"][sta]
-                DL_throughput = STA_dict["DL traffic"]["Throughput"]
-                UL_throughput = STA_dict["UL traffic"]["Throughput"]
-                self.th_DL_throughput_STA.append(DL_throughput)
-                self.th_UL_throughput_STA.append(UL_throughput)
-                self.th_tot_throughput_STA.append(DL_throughput + UL_throughput)
+            self.get_simulation_duration()
+            self.th_DL_throughput_STA = [0 for i in range(self.nb_STAs)]
+            self.th_UL_throughput_STA = [0 for i in range(self.nb_STAs)]
+            self.th_tot_throughput_STA = [0 for i in range(self.nb_STAs)]
+            for sta in self.record_data["Events"][self.last_key]["STAs"]:                
+                STA_dict = self.record_data["Events"][self.last_key]["STAs"][sta]
+                STA_ID = int(sta) - 1 # Minus 1 to get the proper index
+                UL_generated_data = STA_dict["UL traffic"]["Generated data"]
+                self.th_UL_throughput_STA[STA_ID] += UL_generated_data / self.simulation_duration
+                self.th_tot_throughput_STA[STA_ID] += UL_generated_data / self.simulation_duration
+                DL_generated_data = STA_dict["DL traffic"]["Generated data"]
+                self.th_DL_throughput_STA[STA_ID] += DL_generated_data / self.simulation_duration
+                self.th_tot_throughput_STA[STA_ID] += DL_generated_data / self.simulation_duration
                 
             assert(len(self.th_DL_throughput_STA) == self.nb_STAs)
             assert(len(self.th_UL_throughput_STA) == self.nb_STAs)
@@ -189,12 +201,10 @@ class Results():
     def get_th_busy_time(self):
         if len(self.th_busy_time_STA) == 0:
             self.get_nb_STAs()
-            for sta in self.record_data["STAs"]:
-                STA_dict = self.record_data["STAs"][sta]
-                DL_throughput = STA_dict["DL traffic"]["Throughput"]
-                UL_throughput = STA_dict["UL traffic"]["Throughput"]
-                datarate = STA_dict["Datarate"]
-                self.th_busy_time_STA.append((DL_throughput + UL_throughput) / datarate)
+            self.get_th_throughput()
+            self.get_datarate()
+            for th_tot_throughput, datarate in zip(self.th_tot_throughput_STA, self.datarate_STA):
+                self.th_busy_time_STA.append(th_tot_throughput / datarate)
             assert(len(self.th_busy_time_STA) == self.nb_STAs)
 
             self.th_busy_time_avg = sum(self.th_busy_time_STA) / self.nb_STAs
@@ -205,21 +215,31 @@ class Results():
 
     def get_simulation_duration(self):
         if self.simulation_duration == -1:
-            for event in self.record_data["Events"]:
-                event_dict = self.record_data["Events"][event]
-                self.simulation_duration = event_dict["End"]
+            self.simulation_duration = self.record_data["Events"][self.last_key]["End"]
 
     def get_nb_STAs(self):
         if self.nb_STAs == -1:
             self.nb_STAs = 0
             for contender in self.record_data["STAs"]:
-                if contender != "AP":
-                    self.nb_STAs += 1
+                self.nb_STAs += 1
 
     def get_number_of_events(self):
         if self.nb_events == -1:
-            self.nb_events = len(self.record_data["Events"])
+            self.nb_events = len(self.record_data)
 
+    def get_datarate(self):
+        if len(self.datarate_STA) == 0 or self.datarate_avg == -1 or self.datarate_std == -1:
+            self.get_nb_STAs()
+            self.datarate_STA = [0 for i in range(self.nb_STAs)]
+            for sta in self.record_data["STAs"]:
+                STA_dict = self.record_data["STAs"][sta]
+                STA_ID = int(sta) - 1 # Minus 1 to get the proper index
+                self.datarate_STA[STA_ID] = STA_dict["Datarate"]
+
+        self.datarate_avg = sum(self.datarate_STA) / self.nb_STAs
+        self.datarate_std = sum([(x - self.datarate_avg)**2 for x in self.datarate_STA])
+        self.datarate_std = (self.datarate_std / self.nb_STAs) **.5
+            
 
     def compute_busy_time(self):
         if len(self.busy_time_STA) == 0:
@@ -291,14 +311,18 @@ class Results():
             for event in self.record_data["Events"]:
                 for frame in self.record_data["Events"][event]["Frames"]:
                     frame_dict = self.record_data["Events"][event]["Frames"][frame]
-                    if frame_dict["Label"] == "DL Tx" and not frame_dict["Collision"] and not frame_dict["Error"]:
-                        STA_ID = frame_dict["Receiver ID"] - 1 # Minus 1 to get the proper index
-                        self.DL_sent_frames_STA[STA_ID] += 1
-                        self.tot_sent_frames_STA[STA_ID] += 1
-                    elif frame_dict["Label"] == "UL Tx" and not frame_dict["Collision"] and not frame_dict["Error"]:
-                        STA_ID = frame_dict["Sender ID"] - 1 # Minus 1 to get the proper index
-                        self.UL_sent_frames_STA[STA_ID] += 1
-                        self.tot_sent_frames_STA[STA_ID] += 1
+                    if not frame_dict["Collision"] and not frame_dict["Error"]:
+                        if not frame_dict["Label"] in ["beacon", "DL prompt", "UL prompt", "ACK"]:
+                            if frame_dict["Sender ID"] == 0:
+                                # DL Tx                            
+                                STA_ID = frame_dict["Receiver ID"] - 1 # Minus 1 to get the proper index
+                                self.DL_sent_frames_STA[STA_ID] += 1
+                                self.tot_sent_frames_STA[STA_ID] += 1
+                            elif frame_dict["Receiver ID"] == 0:
+                                # UL Tx
+                                STA_ID = frame_dict["Sender ID"] - 1 # Minus 1 to get the proper index
+                                self.UL_sent_frames_STA[STA_ID] += 1
+                                self.tot_sent_frames_STA[STA_ID] += 1
                         
             self.DL_sent_frames_avg = sum(self.DL_sent_frames_STA) / self.nb_STAs
             self.UL_sent_frames_avg = sum(self.UL_sent_frames_STA) / self.nb_STAs
@@ -310,13 +334,6 @@ class Results():
             self.UL_sent_frames_std = (self.UL_sent_frames_std / self.nb_STAs) **.5
             self.tot_sent_frames_std = sum([(st - self.tot_sent_frames_avg)**2 for st in self.tot_sent_frames_STA])
             self.tot_sent_frames_std = (self.tot_sent_frames_std / self.nb_STAs) **.5
-            for i in range(self.nb_STAs):
-                if self.DL_sent_frames_STA[i] == 0:
-                    self.DL_sent_frames_STA[i] = 1
-                if self.UL_sent_frames_STA[i] == 0:
-                    self.UL_sent_frames_STA[i] = 1
-                if self.tot_sent_frames_STA[i] == 0:
-                    self.tot_sent_frames_STA[i] = 1
 
     def compute_DL_prompts(self):
         if len(self.nb_DL_prompts_STA) == 0:
@@ -366,9 +383,9 @@ class Results():
                         self.UL_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
                         self.tot_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
             for sta in range(self.nb_STAs):
-                self.DL_delay_STA[sta] /= self.DL_sent_frames_STA[sta]
-                self.UL_delay_STA[sta] /= self.UL_sent_frames_STA[sta]
-                self.tot_delay_STA[sta] /= self.tot_sent_frames_STA[sta]
+                self.DL_delay_STA[sta] /= max(1, self.DL_sent_frames_STA[sta])
+                self.UL_delay_STA[sta] /= max(1, self.UL_sent_frames_STA[sta])
+                self.tot_delay_STA[sta] /= max(1, self.tot_sent_frames_STA[sta])
                 
             self.DL_delay_avg = sum(self.DL_delay_STA) / self.nb_STAs
             self.UL_delay_avg = sum(self.UL_delay_STA) / self.nb_STAs
@@ -386,14 +403,13 @@ class Results():
             self.DL_generated_frames_STA = [0 for i in range(self.nb_STAs)]
             self.UL_generated_frames_STA = [0 for i in range(self.nb_STAs)]
             self.tot_generated_frames_STA = [0 for i in range(self.nb_STAs)]
-            for sta in self.record_data["STAs"]:
-                if sta != "AP":
-                    STA_dict = self.record_data["STAs"][sta]
-                    STA_ID = STA_dict["ID"] - 1 # Minus 1 to get the proper index
-                    self.DL_generated_frames_STA[STA_ID] += STA_dict["DL traffic"]["Frame counter"]
-                    self.UL_generated_frames_STA[STA_ID] += STA_dict["UL traffic"]["Frame counter"]
-                    self.tot_generated_frames_STA[STA_ID] += STA_dict["DL traffic"]["Frame counter"]
-                    self.tot_generated_frames_STA[STA_ID] += STA_dict["UL traffic"]["Frame counter"]
+            for sta in self.record_data["Events"][self.last_key]["STAs"]:
+                STA_dict = self.record_data["Events"][self.last_key]["STAs"][sta]
+                STA_ID = int(sta) - 1 # Minus 1 to get the proper index
+                self.UL_generated_frames_STA[STA_ID] += STA_dict["UL traffic"]["Frame counter"]
+                self.tot_generated_frames_STA[STA_ID] += STA_dict["UL traffic"]["Frame counter"]
+                self.DL_generated_frames_STA[STA_ID] += STA_dict["DL traffic"]["Frame counter"]
+                self.tot_generated_frames_STA[STA_ID] += STA_dict["DL traffic"]["Frame counter"]
                     
             self.DL_generated_frames_avg = sum(self.DL_generated_frames_STA) / self.nb_STAs
             self.UL_generated_frames_avg = sum(self.UL_generated_frames_STA) / self.nb_STAs
@@ -415,14 +431,14 @@ class Results():
             self.Rx_STA = [0 for i in range(self.nb_STAs)]
             self.Tx_STA = [0 for i in range(self.nb_STAs)]
             self.doze_STA = [0 for i in range(self.nb_STAs)]
-            for sta in self.record_data["STAs"]:
+            for sta in self.record_data["Events"][self.last_key]["STAs"]:
                 if sta != "AP":
-                    STA_ID = self.record_data["STAs"][sta]["ID"] - 1 # Minus 1 to get the proper index
-                    self.idle_STA[STA_ID] += self.record_data["STAs"][sta]["counters"]["idle"]
-                    self.CCA_STA[STA_ID] += self.record_data["STAs"][sta]["counters"]["CCA_busy"]
-                    self.Rx_STA[STA_ID] += self.record_data["STAs"][sta]["counters"]["Rx"]
-                    self.Tx_STA[STA_ID] += self.record_data["STAs"][sta]["counters"]["Tx"]
-                    self.doze_STA[STA_ID] += self.record_data["STAs"][sta]["counters"]["doze"]
+                    STA_ID = int(sta) - 1 # Minus 1 to get the proper index
+                    self.idle_STA[STA_ID] += self.record_data["Events"][self.last_key]["STAs"][sta]["idle time"]
+                    self.CCA_STA[STA_ID] += self.record_data["Events"][self.last_key]["STAs"][sta]["CCA time"]
+                    self.Rx_STA[STA_ID] += self.record_data["Events"][self.last_key]["STAs"][sta]["Rx time"]
+                    self.Tx_STA[STA_ID] += self.record_data["Events"][self.last_key]["STAs"][sta]["Tx time"]
+                    self.doze_STA[STA_ID] += self.record_data["Events"][self.last_key]["STAs"][sta]["doze time"]
             for sta in range(self.nb_STAs):
                 self.idle_STA[sta] /= self.simulation_duration
                 self.CCA_STA[sta] /= self.simulation_duration
@@ -505,7 +521,7 @@ class Results():
                         else:
                             index = sender_ID - 1
                             self.nb_collisions_STA[index] += 1
-            self.collision_rate_AP = self.nb_collisions_AP / self.Tx_attempts_AP
+            self.collision_rate_AP = self.nb_collisions_AP / max(1, self.Tx_attempts_AP)
             self.collision_rate_STA = [0 for i in range(self.nb_STAs)]
             for sta in range(self.nb_STAs):
                 self.collision_rate_STA[sta] = self.nb_collisions_STA[sta] / max(1,self.Tx_attempts_STA[sta])
@@ -535,7 +551,7 @@ class Results():
                         self.sending_frame_attempts_STA[index] += 1
                         if frame_dict["Error"]:
                             self.nb_errors_STA[index] += 1
-            self.error_rate_AP = self.nb_errors_AP / self.sending_frame_attempts_AP
+            self.error_rate_AP = self.nb_errors_AP / max(1, self.sending_frame_attempts_AP)
             self.error_rate_STA = [0 for i in range(self.nb_STAs)]
             for sta in range(self.nb_STAs):
                 self.error_rate_STA[sta] = self.nb_errors_STA[sta] / max(1,self.sending_frame_attempts_STA[sta])
@@ -552,6 +568,12 @@ class Results():
         result["Simulation duration"] = self.simulation_duration
         result["Number of events"] = self.nb_events
         result["Number of STAs"] = self.nb_STAs
+        datarate = dict()
+        for x,y in enumerate(self.datarate_STA):
+            datarate[str(x+1)] = y
+        result["Datarate STA"] = datarate
+        result["Datarate avg"] = self.datarate_avg
+        result["Datarate std"] = self.datarate_std
 
         result["Theoritical busy time medium"] = self.th_busy_time_medium
         th_busy_time_dict = dict()

@@ -14,7 +14,7 @@ class Frame:
         self.sender_ID = sender_ID
         self.receiver_ID = receiver_ID
         self.size = size
-        self.label = label
+        self.label = label.replace('\n', '')
         self.priority = priority
 
         self.nb_of_transmissions = 0

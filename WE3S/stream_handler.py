@@ -30,8 +30,8 @@ class Stream:
     def use_prompt(self):
         return self.received_prompt is not None
 
-    def get_destination_ID(self):
-        return self.frame_generator.destination_ID
+    def get_receiver_ID(self):
+        return self.frame_generator.receiver_ID
 
     def get_sender_ID(self):
         return self.frame_generator.sender_ID
@@ -61,7 +61,7 @@ class Stream:
                 return [self.create_ACK()]
 
     def create_ACK(self):
-        ACK = Frame(self.current_time, self.get_sender_ID(), self.get_destination_ID(), "ACK", "HIGH", ACK_SIZE)
+        ACK = Frame(self.current_time, self.get_sender_ID(), self.get_receiver_ID(), "ACK", "HIGH", ACK_SIZE)
         ACK.EOSP = True
         return ACK
 
@@ -191,6 +191,9 @@ class Stream:
                 result_final = False
         assert(result_final)
 
+    def get_dictionary(self):
+        return self.frame_generator.get_dictionary()
+        
 
 class Data_stream(Stream):
 
@@ -198,21 +201,51 @@ class Data_stream(Stream):
         Stream.__init__(self)
         self.frame_generator = frame_generator
 
+    def set_traffic(self, sender_ID, receiver_ID, label, traffic_type, arg_dict):
+        if traffic_type == "Constant":
+            frame_size = arg_dict["Frame size"]
+            frame_interval = arg_dict["Frame interval"]
+            self.frame_generator = Constant_frame_generator(sender_ID, receiver_ID, label, frame_interval, frame_size)
+        elif traffic_type == "Poisson":
+            frame_size = arg_dict["Frame size"]
+            frame_interval = arg_dict["Frame interval"]
+            self.frame_generator = Poisson_frame_generator(sender_ID, receiver_ID, label, frame_interval, frame_size)
+        elif traffic_type == "Hyperexponential":
+            frame_size = arg_dict["Frame size"]
+            frame_interval_1 = arg_dict["Frame interval 1"]
+            frame_interval_2 = arg_dict["Frame interval 2"]
+            probability = arg_dict["Probability"]
+            self.frame_generator = Hyperexponential_frame_generator(sender_ID, receiver_ID, label, frame_size,
+                                                                       frame_interval_1, frame_interval_2, probability)
+        elif traffic_type == "Trace":
+            trace_filename = arg_dict["Trace filename"]
+            self.frame_generator = Frame_generator_from_trace_file(sender_ID, receiver_ID, label, trace_filename)
+        else:
+            print(f"{Fore.RED}ERROR: this traffic type does not exist:", traffic_type)
+            print(f"{Style.RESET_ALL}")
+            assert(0)
+
 
 
 class Prompt_stream(Stream):
 
-    def __init__(self, sender_ID, destination_ID, label):
+    def __init__(self, sender_ID, receiver_ID, label):
         Stream.__init__(self)
 
         self.sender_ID = sender_ID
-        self.destination_ID = destination_ID
+        self.receiver_ID = receiver_ID
         self.label = label
 
         self.prompt_strategy = None
 
     def initialize(self):
         self.load_next_scheduled_frame()
+
+    def get_receiver_ID(self):
+        return self.receiver_ID
+
+    def get_sender_ID(self):
+        return self.sender_ID
 
     def set_strategy(self, strategy_name, arg_dict):
         if strategy_name == "None":
@@ -240,12 +273,9 @@ class Prompt_stream(Stream):
              return None
          return Stream.get_transmission_time_slot(self, backoff)
 
-    def get_destination_ID(self):
-        return self.destination_ID
-
     def create_frame(self, creation_time):
         assert(creation_time > self.current_time)
-        return Frame(creation_time, self.sender_ID, self.destination_ID, self.label, "LOW", PROMPT_SIZE)
+        return Frame(creation_time, self.sender_ID, self.receiver_ID, self.label, "LOW", PROMPT_SIZE)
 
     def remove_frame(self, frame_ID):
         for frame in self.pending_frame_table:
@@ -310,9 +340,7 @@ class Beacon_stream(Stream):
     def __init__(self):
         Stream.__init__(self)
         self.priority = 1
-        self.frame_generator = Frame_generator(1, BEACON_SIZE, 0, 0, "beacon", False)
-        self.frame_generator.set_frequency(1 / float(TBTT))
-        # self.frame_generator.is_interval_random = False
+        self.frame_generator = Constant_frame_generator(0, 0, "beacon", TBTT, BEACON_SIZE)
 
     def update_time(self, current_time):
         Stream.update_time(self, current_time)

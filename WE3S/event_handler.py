@@ -1,10 +1,10 @@
 from colorama import Fore
 from colorama import Style
 from sortedcontainers import SortedSet
+from numpy import random
 import math
 import gc
 import time
-import random
 
 from WE3S.event import *
 from WE3S.record import *
@@ -23,7 +23,7 @@ class Event_handler:
         self.sent_frames = SortedSet()
         self.record = Record()
         self.PER = PER
-        
+
         self.contenders.append(AP(0))
 
 
@@ -38,25 +38,14 @@ class Event_handler:
             self.contenders.append(sta)
             ap.add_STA(sta)
 
-    def set_DL_throughput(self, STA_ID, throughput, is_interval_random):
-        assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        assert(throughput > 0)
-        self.contenders[STA_ID].set_DL_throughput(throughput, is_interval_random)
 
-    def set_DL_frame_size(self, STA_ID, frame_size):
-        assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        assert(frame_size > 0)
-        self.contenders[STA_ID].set_DL_frame_size(frame_size)
-        
-    def set_UL_throughput(self, STA_ID, throughput, is_interval_random):
-        assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        assert(throughput > 0)
-        self.contenders[STA_ID].set_UL_throughput(throughput, is_interval_random)
+    def set_DL_traffic(self, STA_ID, traffic_type, arg_dict):
+        assert(STA_ID > 0 and STA_ID <= len(self.contenders))
+        self.contenders[0].set_DL_traffic(STA_ID, traffic_type, arg_dict)
 
-    def set_UL_frame_size(self, STA_ID, frame_size):
-        assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        assert(frame_size > 0)
-        self.contenders[STA_ID].set_UL_frame_size(frame_size)
+    def set_UL_traffic(self, STA_ID, traffic_type, arg_dict):
+        assert(STA_ID > 0 and STA_ID <= len(self.contenders))
+        self.contenders[STA_ID].set_UL_traffic(traffic_type, arg_dict)
 
     def set_link_capacity(self, STA_ID, link_capacity):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
@@ -130,7 +119,7 @@ class Event_handler:
             self.next_event = earliest_events[0]
             for frame in self.next_event.frame_table:
                 frame.nb_of_transmissions += 1
-                if self.PER is not None and random.randint(1, 1 / self.PER) == 1:
+                if self.PER is not None and random.binomial(size=1, n=1, p=PER):
                     frame.is_in_error = True
                 else:
                     if frame.ID in self.sent_frames:
@@ -180,15 +169,43 @@ class Event_handler:
             frame.has_collided = False
 
     def record_event(self):
+        all_STA_dict = dict()
+        nb_STAs = len(self.contenders)
+        for STA_ID in range(1, nb_STAs):
+            STA_dict = dict()
+            DL_traffic_index = self.contenders[0].stream_information[str(STA_ID)]["DL Tx index"]
+            DL_traffic = self.contenders[0].stream_table[DL_traffic_index]
+            DL_traffic_dict = {
+                "Frame counter": DL_traffic.frame_generator.frame_counter,
+                "Generated data": DL_traffic.frame_generator.total_generated_data,
+                "Pending frames": len(DL_traffic.pending_frame_table)
+            }
+            STA_dict["DL traffic"] = DL_traffic_dict
+            UL_traffic = self.contenders[STA_ID].UL_data_stream
+            UL_traffic_dict = {
+                "Frame counter": UL_traffic.frame_generator.frame_counter,
+                "Generated data": UL_traffic.frame_generator.total_generated_data,
+                "Pending frames": len(UL_traffic.pending_frame_table)
+            }
+            STA_dict["UL traffic"] = UL_traffic_dict
+            # STA_dict["Datarate"] = self.contenders[0].wlan.get_link_capacity(STA_ID)
+            state_counter = self.contenders[STA_ID].state_counter
+            STA_dict["Tx time"] = float(state_counter.Tx)
+            STA_dict["Rx time"] = float(state_counter.Rx)
+            STA_dict["CCA time"] = float(state_counter.CCA_busy)
+            STA_dict["idle time"] = float(state_counter.idle)
+            STA_dict["doze time"] = float(state_counter.doze)
+            all_STA_dict[str(STA_ID)] = STA_dict.copy()
+        
         gc.disable()
-        self.record.add_event(self.next_event)
+        self.record.add_event(self.next_event, all_STA_dict)
         gc.enable()
         assert(self.record.current_time == self.current_time)
 
     def print_timeline(self):
         for contender in self.contenders:
             contender.print_timeline()
-                
+
     def get_earliest_events(self):
         if len(self.events) == 0:
             return []
@@ -206,4 +223,32 @@ class Event_handler:
             return earliest_events
     
 
+    def get_record(self):
+        result = dict()
+        all_STA_dict = dict()
+        for STA in self.contenders[1:]:
+            STA_dict = dict()
+            STA_dict["Datarate"] = STA.wlan.get_link_capacity(STA.ID)
+            STA_dict["use DL slot"] = STA.use_DL_slot()
+            STA_dict["use DL prompt"] = STA.use_DL_prompt()
+            STA_dict["use UL slot"] = STA.use_UL_slot()
+            STA_dict["use UL prompt"] = STA.use_UL_prompt()
+            if STA_dict["use DL slot"]:
+                # DL_slot_dict = dict()
+                # DL_slot_dict["Start"] = float(STA.DL_slot.start)
+                # DL_slot_dict["Duration"] = STA.DL_slot.duration
+                # DL_slot_dict["Interval"] = STA.DL_slot.interval
+                STA_dict["DL slot"] = STA.DL_slot.get_dictionary()
+            if STA_dict["use UL slot"]:
+                # UL_slot_dict = dict()
+                # UL_slot_dict["Start"] = STA.UL_slot.start
+                # UL_slot_dict["Duration"] = STA.UL_slot.duration
+                # UL_slot_dict["Interval"] = STA.UL_slot.interval
+                STA_dict["UL slot"] = STA.UL_slot.get_dictionary()
+            all_STA_dict[str(STA.ID)] = STA_dict
+
+        result["STAs"] = all_STA_dict
+        result["Events"] = self.record.get_dictionary()
+        
+        return result
 

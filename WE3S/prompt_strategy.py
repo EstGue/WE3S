@@ -1,4 +1,4 @@
-import random
+from numpy import random
 from colorama import Fore
 from colorama import Style
 
@@ -50,13 +50,10 @@ class Prompt_strategy_TCP_like (Prompt_strategy):
             if not frame.is_in_error:
                 nb_returned_frames += 1
 
-        if nb_returned_frames == self.max_nb_returned_frames:
-            self.next_interval /= 2
+        if nb_returned_frames >= self.max_nb_returned_frames:
+            self.next_interval = self.min_prompt_interval
         elif nb_returned_frames > self.objective_nb_returned_frames:
-            if self.next_interval <= self.prompt_interval_incrementation_step:
-                self.next_interval = self.min_prompt_interval
-            else:
-                self.next_interval -= self.prompt_interval_incrementation_step
+            self.next_interval /= 2
         elif nb_returned_frames < self.objective_nb_returned_frames:
             self.next_interval += self.prompt_interval_incrementation_step
 

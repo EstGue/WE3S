@@ -1,5 +1,5 @@
 import math
-import random
+from numpy import random
 
 from WE3S.visualisation import *
 from WE3S.event import *

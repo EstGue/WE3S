@@ -1,4 +1,4 @@
-import random
+from numpy import random
 
 from WE3S.common_parameters import *
 from WE3S.card_state import *
