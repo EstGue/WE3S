@@ -278,23 +278,27 @@ class Results():
                 event_dict = self.record_data["Events"][event]
                 for frame in event_dict["Frames"]:
                     frame_dict = event_dict["Frames"][frame]
-                    if frame_dict["Label"] == "DL Tx" and not frame_dict["Collision"] and not frame_dict["Error"]:
-                        STA_ID = frame_dict["Receiver ID"] - 1 # Minus 1 to get the proper index 
-                        self.DL_throughput_STA[STA_ID] += frame_dict["Size"]
-                        self.tot_throughput_STA[STA_ID] += frame_dict["Size"]
-                    elif frame_dict["Label"] == "UL Tx" and not frame_dict["Collision"] and not frame_dict["Error"]:
-                        STA_ID = frame_dict["Sender ID"] - 1 # Minus 1 to get the proper index
-                        self.UL_throughput_STA[STA_ID] += frame_dict["Size"]
-                        self.tot_throughput_STA[STA_ID] += frame_dict["Size"]
+                    if not frame_dict["Label"] in ["beacon", "DL prompt", "UL prompt", "ACK"]:
+                        if not frame_dict["Collision"] and not frame_dict["Error"]:
+                            if frame_dict["Sender ID"] == 0:
+                                # DL Tx
+                                STA_ID = frame_dict["Receiver ID"] - 1 # Minus 1 to get the proper index 
+                                self.DL_throughput_STA[STA_ID] += frame_dict["Size"]
+                                self.tot_throughput_STA[STA_ID] += frame_dict["Size"]
+                            elif frame_dict["Receiver ID"] == 0:
+                                # UL Tx
+                                STA_ID = frame_dict["Sender ID"] - 1 # Minus 1 to get the proper index
+                                self.UL_throughput_STA[STA_ID] += frame_dict["Size"]
+                                self.tot_throughput_STA[STA_ID] += frame_dict["Size"]
             for sta in range(self.nb_STAs):
                 self.DL_throughput_STA[sta] /= self.simulation_duration
                 self.UL_throughput_STA[sta] /= self.simulation_duration
                 self.tot_throughput_STA[sta] /= self.simulation_duration
-                
+
             self.DL_throughput_avg = sum(self.DL_throughput_STA) / self.nb_STAs
             self.UL_throughput_avg = sum(self.UL_throughput_STA) / self.nb_STAs
             self.tot_throughput_avg = sum(self.tot_throughput_STA) / self.nb_STAs
-            
+
             self.DL_throughput_std = sum([(th - self.DL_throughput_avg)**2 for th in self.DL_throughput_STA])
             self.DL_throughput_std = (self.DL_throughput_std / self.nb_STAs) **.5
             self.UL_throughput_std = sum([(th - self.UL_throughput_avg)**2 for th in self.UL_throughput_STA])

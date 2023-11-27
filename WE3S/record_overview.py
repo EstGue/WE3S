@@ -11,7 +11,6 @@ class Record_overview:
 
     def __init__(self, record, time_step):
         self.record = record.copy()
-        print(json.dumps(self.record, indent=4))
         self.time_step = time_step
         self.record_slice_table = []
         self.result_slice_table = []
@@ -105,9 +104,9 @@ class Record_overview:
                     UL_generated_frames.append(0)
                     tot_generated_frames.append(0)
                 else:
-                    DL_sent_frames.append(result_slice.DL_sent_frames_STA[STA_ID - 1])
-                    UL_sent_frames.append(result_slice.UL_sent_frames_STA[STA_ID - 1])
-                    tot_sent_frames.append(result_slice.tot_sent_frames_STA[STA_ID - 1])
+                    DL_sent_frames.append(-result_slice.DL_sent_frames_STA[STA_ID - 1])
+                    UL_sent_frames.append(-result_slice.UL_sent_frames_STA[STA_ID - 1])
+                    tot_sent_frames.append(-result_slice.tot_sent_frames_STA[STA_ID - 1])
 
                     DL_tmp = result_slice.DL_generated_frames_STA[STA_ID - 1]
                     UL_tmp = result_slice.UL_generated_frames_STA[STA_ID - 1]
@@ -119,10 +118,11 @@ class Record_overview:
                     already_UL_generated = UL_tmp
                     already_tot_generated = tot_tmp
 
-
         window_size = window_end_time - window_start_time
-        real_window_start = window_start_time - 0.05 * window_size
-        real_window_end = window_end_time + 0.05 * window_size
+        real_window_start = window_start_time - 0.5 * window_size
+        showing_window_start = window_start_time - 0.05 * window_size
+        real_window_end = window_end_time + 0.5 * window_size
+        showing_window_end = window_end_time + 0.05 * window_size
         ax = plt.subplot(211)
         plt.suptitle("Simulation monitoring", fontsize=17)
         plt.title("Time step: " + str(self.time_step))
@@ -131,25 +131,28 @@ class Record_overview:
         plt.axvspan(window_end_time, real_window_end, color="grey")
         for DL_slot in involved_DL_slot:
             plt.axvspan(DL_slot[0], DL_slot[1], color="green", alpha=0.1)
-        plt.bar(time_table, DL_generated_frames, width = 0.75*self.time_step, color="red", label="Generated frames")
-        plt.bar(time_table, DL_sent_frames, width=0.75*self.time_step, color="blue", label="Sent frames", alpha=0.5)
+        plt.bar(time_table, DL_generated_frames, width = 0.75*self.time_step, color="teal", label="Generated frames")
+        plt.bar(time_table, DL_sent_frames, width=0.75*self.time_step, color="mediumturquoise", label="Sent frames")
         plt.legend(loc="upper right")
-        plt.grid(linestyle=":", color="gray", alpha=0.5)
+        plt.grid(linestyle=":", color="gray", alpha=0.5, axis="y")
         plt.ylabel("Nb of sent frames (DL)")
-        ax.set_xlim([real_window_start, real_window_end])
-
+        ax.set_xlim([showing_window_start, showing_window_end])
+        ticks = ax.get_yticks()
+        # ax.set_yticklabels([int(abs(tick)) for tick in ticks])
+        
         ax = plt.subplot(212)
         plt.axvspan(real_window_start, window_start_time, color="grey")
         plt.axvspan(window_end_time, real_window_end, color="grey")
         for UL_slot in involved_UL_slot:
-            plt.axvspan(UL_slot[0], UL_slot[1], color="green", alpha=0.1)
-        plt.bar(time_table, UL_generated_frames, width = 0.75*self.time_step, color="red", label="Generated frames")
-        plt.bar(time_table, UL_sent_frames, width=0.75*self.time_step, color="blue", label="Sent frames", alpha=0.5)
-        plt.grid(linestyle=":", color="gray", alpha=0.5)
+            plt.axvspan(UL_slot[0], UL_slot[1], color="orange", alpha=0.5)
+        plt.bar(time_table, UL_generated_frames, width = 0.75*self.time_step, color="teal", label="Generated frames")
+        plt.bar(time_table, UL_sent_frames, width=0.75*self.time_step, color="mediumturquoise", label="Sent frames")
+        plt.grid(linestyle=":", color="gray", alpha=0.5, axis="y")
         plt.legend(loc="upper right")
         plt.ylabel("Nb of sent frames (UL)")
         plt.xlabel("Simulation time (s)", fontsize=13)
-        ax.set_xlim([real_window_start, real_window_end])
+        ax.set_xlim([showing_window_start, showing_window_end])
+        # ax.set_yticklabels([int(abs(tick)) for tick in ticks])
 
         # plt.subplot(313)
         # plt.plot(tot_sent_frames)
