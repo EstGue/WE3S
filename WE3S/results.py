@@ -346,7 +346,7 @@ class Results():
             for event in self.record_data["Events"]:
                 for frame in self.record_data["Events"][event]["Frames"]:
                     frame_dict = self.record_data["Events"][event]["Frames"][frame]
-                    if frame_dict["Label"] == "DL_prompt" and not frame_dict["Collision"] and not frame_dict["Error"]:
+                    if frame_dict["Label"] == "DL prompt" and not frame_dict["Collision"] and not frame_dict["Error"]:
                         STA_ID = frame_dict["Sender ID"] - 1
                         self.nb_DL_prompts_STA[STA_ID] += 1
             self.nb_DL_prompts_avg = sum(self.nb_DL_prompts_STA) / self.nb_STAs
@@ -378,14 +378,18 @@ class Results():
                 event_dict = self.record_data["Events"][event]
                 for frame in self.record_data["Events"][event]["Frames"]:
                     frame_dict = self.record_data["Events"][event]["Frames"][frame]
-                    if frame_dict["Label"] == "DL Tx" and not frame_dict["Collision"] and not frame_dict["Error"]:
-                        STA_ID = frame_dict["Receiver ID"] - 1 # Minus 1 to get the proper index
-                        self.DL_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
-                        self.tot_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
-                    elif frame_dict["Label"] == "UL Tx" and not frame_dict["Collision"] and not frame_dict["Error"]:
-                        STA_ID = frame_dict["Sender ID"] - 1 # Minus 1 to get the proper index
-                        self.UL_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
-                        self.tot_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
+                    if not frame_dict["Label"] in ["beacon", "DL prompt", "UL prompt", "ACK"]:
+                        if not frame_dict["Collision"] and not frame_dict["Error"]:
+                            if frame_dict["Sender ID"] == 0:
+                                #DL Tx
+                                STA_ID = frame_dict["Receiver ID"] - 1 # Minus 1 to get the proper index
+                                self.DL_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
+                                self.tot_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
+                            elif frame_dict["Receiver ID"] == 0:
+                                #UL Tx
+                                STA_ID = frame_dict["Sender ID"] - 1 # Minus 1 to get the proper index
+                                self.UL_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
+                                self.tot_delay_STA[STA_ID] += event_dict["End"] - frame_dict["Creation time"]
             for sta in range(self.nb_STAs):
                 self.DL_delay_STA[sta] /= max(1, self.DL_sent_frames_STA[sta])
                 self.UL_delay_STA[sta] /= max(1, self.UL_sent_frames_STA[sta])
