@@ -135,6 +135,14 @@ class Results():
         self.doze_avg = -1
         self.doze_std = -1
 
+        self.nb_switch_doze_to_awake_STA = []
+        self.nb_switch_doze_to_awake_avg = -1
+        self.nb_switch_doze_to_awake_std = -1
+
+        self.nb_switch_awake_to_doze_STA = []
+        self.nb_switch_awake_to_doze_avg = -1
+        self.nb_switch_awake_to_doze_std = -1
+        
         self.consumption_STA = []
         self.consumption_avg = -1
         self.consumption_std = -1
@@ -439,6 +447,8 @@ class Results():
             self.Rx_STA = [0 for i in range(self.nb_STAs)]
             self.Tx_STA = [0 for i in range(self.nb_STAs)]
             self.doze_STA = [0 for i in range(self.nb_STAs)]
+            self.nb_switch_doze_to_awake_STA = [0 for i in range(self.nb_STAs)]
+            self.nb_switch_awake_to_doze_STA = [0 for i in range(self.nb_STAs)]
             for sta in self.record_data["Events"][self.last_key]["STAs"]:
                 if sta != "AP":
                     STA_ID = int(sta) - 1 # Minus 1 to get the proper index
@@ -447,6 +457,9 @@ class Results():
                     self.Rx_STA[STA_ID] += self.record_data["Events"][self.last_key]["STAs"][sta]["Rx time"]
                     self.Tx_STA[STA_ID] += self.record_data["Events"][self.last_key]["STAs"][sta]["Tx time"]
                     self.doze_STA[STA_ID] += self.record_data["Events"][self.last_key]["STAs"][sta]["doze time"]
+                    self.nb_switch_doze_to_awake_STA[STA_ID] = self.record_data["STAs"][sta]["counters"]["Switch doze to awake"]
+                    self.nb_switch_awake_to_doze_STA[STA_ID] = self.record_data["STAs"][sta]["counters"]["Switch awake to doze"]
+
             for sta in range(self.nb_STAs):
                 self.idle_STA[sta] /= self.simulation_duration
                 self.CCA_STA[sta] /= self.simulation_duration
@@ -459,29 +472,47 @@ class Results():
             self.Rx_avg = sum(self.Rx_STA) / self.nb_STAs
             self.Tx_avg = sum(self.Tx_STA) / self.nb_STAs
             self.doze_avg = sum(self.doze_STA) / self.nb_STAs
+            self.nb_switch_doze_to_awake_avg = sum(self.nb_switch_doze_to_awake_STA) / self.nb_STAs
+            self.nb_switch_awake_to_doze_avg = sum(self.nb_switch_awake_to_doze_STA) / self.nb_STAs
             
             self.idle_std = sum([(x - self.idle_avg)**2 for x in self.idle_STA])
             self.CCA_std = sum([(x - self.CCA_avg)**2 for x in self.CCA_STA])
             self.Rx_std = sum([(x - self.Rx_avg)**2 for x in self.Rx_STA])
             self.Tx_std = sum([(x - self.Tx_avg)**2 for x in self.Tx_STA])
             self.doze_std = sum([(x - self.doze_avg)**2 for x in self.doze_STA])
+            self.nb_switch_doze_to_awake_std = sum([(x - self.nb_switch_doze_to_awake_avg)**2 for x in self.nb_switch_doze_to_awake_STA])
+            self.nb_switch_awake_to_doze_std = sum([(x - self.nb_switch_awake_to_doze_avg)**2 for x in self.nb_switch_awake_to_doze_STA])
             self.idle_std = (self.idle_std / self.nb_STAs) **.5
             self.CCA_std = (self.CCA_std / self.nb_STAs) **.5
             self.Rx_std = (self.Rx_std / self.nb_STAs) **.5
             self.Tx_std = (self.Tx_std / self.nb_STAs) **.5
             self.doze_std = (self.doze_std / self.nb_STAs) **.5
+            self.nb_switch_doze_to_awake_std = (self.nb_switch_doze_to_awake_std / self.nb_STAs)**.5
+            self.nb_switch_awake_to_doze_std = (self.nb_switch_awake_to_doze_std / self.nb_STAs)**.5
 
     def compute_energy_consumption(self):
         if len(self.consumption_STA) == 0:
             self.get_nb_STAs()
             self.compute_counters()
+            self.compute_sent_frames()
+            self.get_simulation_duration()
             self.consumption_STA = [0 for i in range(self.nb_STAs)]
             for sta in range(self.nb_STAs):
                 self.consumption_STA[sta] += self.idle_STA[sta] * IDLE_CONSUMPTION
                 self.consumption_STA[sta] += self.CCA_STA[sta] * CCA_CONSUMPTION
                 self.consumption_STA[sta] += self.Rx_STA[sta] * RX_CONSUMPTION
                 self.consumption_STA[sta] += self.Tx_STA[sta] * TX_CONSUMPTION
-                self.consumption_STA[sta] += self.doze_STA[sta] * DOZE_CONSUMPTION
+                awake_to_doze_time = self.nb_switch_awake_to_doze_STA[sta] * float(SWITCH_AWAKE_TO_DOZE_DURATION)
+                doze_to_awake_time = self.nb_switch_doze_to_awake_STA[sta] * float(SWITCH_DOZE_TO_AWAKE_DURATION)
+                real_doze_time = self.doze_STA[sta] - awake_to_doze_time - doze_to_awake_time
+                assert(real_doze_time >= 0)
+                self.consumption_STA[sta] += real_doze_time * DOZE_CONSUMPTION
+                self.consumption_STA[sta] += awake_to_doze_time * SWITCH_AWAKE_TO_DOZE_CONSUMPTION
+                self.consumption_STA[sta] += doze_to_awake_time * SWITCH_DOZE_TO_AWAKE_CONSUMPTION
+                # Crossfactor
+                total_crossfactor = self.DL_sent_frames_STA[sta] * RECEPTION_CROSSFACTOR_CONSUMPTION
+                total_crossfactor += self.UL_sent_frames_STA[sta] * EMISSION_CROSSFACTOR_CONSUMPTION
+                self.consumption_STA[sta] += total_crossfactor / self.simulation_duration
 
             self.consumption_avg = sum(self.consumption_STA) / self.nb_STAs
             
@@ -769,12 +800,26 @@ class Results():
         result["doze avg"] = self.doze_avg
         result["doze std"] = self.doze_std
 
+        doze_to_awake = dict()
+        for x,y in enumerate(self.nb_switch_doze_to_awake_STA):
+            doze_to_awake[str(x+1)] = y
+        result["Nb switch doze to awake STA"] = doze_to_awake
+        result["Nb switch doze to awake avg"] = self.nb_switch_doze_to_awake_avg
+        result["Nb switch doze to awake std"] = self.nb_switch_doze_to_awake_std
+
+        awake_to_doze = dict()
+        for x,y in enumerate(self.nb_switch_awake_to_doze_STA):
+            awake_to_doze[str(x+1)] = y
+        result["Nb switch awake to doze STA"] = awake_to_doze
+        result["Nb switch awake to doze avg"] = self.nb_switch_awake_to_doze_avg
+        result["Nb switch awake to doze std"] = self.nb_switch_awake_to_doze_std
+        
         consumption = dict()
         for x,y in enumerate(self.consumption_STA):
             consumption[str(x+1)] = y
         result["Consumption STA"] = consumption
         result["Consumption avg"] = self.consumption_avg
         result["Consumption std"] = self.consumption_std
-        
+
         return result
     
