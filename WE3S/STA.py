@@ -189,6 +189,9 @@ class STA (Contender):
             if self.wait_for_DL_prompt_answer:
                 return
             transmission_time = self.UL_data_stream.get_transmission_time(self.backoff)
+            if self.use_DL_prompt():
+                DL_prompt_transmission_time = self.DL_prompt_stream.get_transmission_time(self.backoff)
+                transmission_time = min(transmission_time, DL_prompt_transmission_time)
             if transmission_time ==-1:
                 return
             if Timestamp(transmission_time) - self.current_time > MIN_DOZE_DURATION:

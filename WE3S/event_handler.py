@@ -30,8 +30,8 @@ class Event_handler:
     ## SET SIMULATION PARAMETERS
 
     def set_nb_STAs(self, nb_STAs):
+        ap = self.contenders[0]
         self.contenders.clear()
-        ap = AP(0)
         self.contenders = [ap]
         for i in range(1, nb_STAs+1):
             sta = STA(i)
@@ -227,24 +227,17 @@ class Event_handler:
         result = dict()
         all_STA_dict = dict()
         for STA in self.contenders[1:]:
-            STA_dict = dict()
-            STA_dict["Datarate"] = STA.wlan.get_link_capacity(STA.ID)
-            STA_dict["use DL slot"] = STA.use_DL_slot()
-            STA_dict["use DL prompt"] = STA.use_DL_prompt()
-            STA_dict["use UL slot"] = STA.use_UL_slot()
-            STA_dict["use UL prompt"] = STA.use_UL_prompt()
-            if STA_dict["use DL slot"]:
-                # DL_slot_dict = dict()
-                # DL_slot_dict["Start"] = float(STA.DL_slot.start)
-                # DL_slot_dict["Duration"] = STA.DL_slot.duration
-                # DL_slot_dict["Interval"] = STA.DL_slot.interval
-                STA_dict["DL slot"] = STA.DL_slot.get_dictionary()
-            if STA_dict["use UL slot"]:
-                # UL_slot_dict = dict()
-                # UL_slot_dict["Start"] = STA.UL_slot.start
-                # UL_slot_dict["Duration"] = STA.UL_slot.duration
-                # UL_slot_dict["Interval"] = STA.UL_slot.interval
-                STA_dict["UL slot"] = STA.UL_slot.get_dictionary()
+            STA_dict = STA.get_dictionary()
+            # STA_dict = dict()
+            # STA_dict["Datarate"] = STA.wlan.get_link_capacity(STA.ID)
+            # STA_dict["use DL slot"] = STA.use_DL_slot()
+            # STA_dict["use DL prompt"] = STA.use_DL_prompt()
+            # STA_dict["use UL slot"] = STA.use_UL_slot()
+            # STA_dict["use UL prompt"] = STA.use_UL_prompt()
+            # if STA_dict["use DL slot"]:
+            #     STA_dict["DL slot"] = STA.DL_slot.get_dictionary()
+            # if STA_dict["use UL slot"]:
+            #     STA_dict["UL slot"] = STA.UL_slot.get_dictionary()
             all_STA_dict[str(STA.ID)] = STA_dict
 
         result["STAs"] = all_STA_dict

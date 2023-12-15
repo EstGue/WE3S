@@ -16,7 +16,9 @@ class Card_state:
         self.CCA_busy = Timestamp(0)
         self.idle = Timestamp(0)
         self.doze = Timestamp(0)
-
+        self.nb_switch_awake_to_doze = 0
+        self.nb_switch_doze_to_awake = 0
+        
         self.current_time = Timestamp(0)
 
         self.wakeup_time = None
@@ -33,7 +35,7 @@ class Card_state:
         self.wakeup_time = None
 
 ## HANDLES NEW EVENTS
-            
+
     def add_event(self, event):
         if event.is_sender(self.STA_ID):
             self.nothing_happens_until(event.start)
@@ -47,7 +49,7 @@ class Card_state:
         else:
             self.nothing_happens_until(event.start)
             self.add_event_not_participating(event)
-            
+
         if DEBUG:
             self.timeline.add_separation()
 
@@ -59,8 +61,9 @@ class Card_state:
             elif Timestamp(self.wakeup_time) <= self.current_time:
                 self.idle_until(time)
             else:
-                if self.wakeup_time < time:
+                if self.wakeup_time <= time:
                     self.doze_until(self.wakeup_time)
+                    self.nb_switch_doze_to_awake += 1
                     self.idle_until(time)
                 else:
                     self.doze_until(time)
@@ -72,6 +75,8 @@ class Card_state:
                     SP_end = self.DL_slot.get_current_SP_end(self.current_time)
                     if time <= SP_end:
                         finish = True
+                    if SP_end <= time:
+                        self.nb_switch_awake_to_doze += 1
                     self.idle_until(min(SP_end, time))
                 else:
                     next_SP_start = self.DL_slot.get_next_SP_start(self.current_time)
@@ -80,6 +85,7 @@ class Card_state:
                     if time <= next_SP_start:
                         finish = True
                     else:
+                        self.nb_switch_doze_to_awake += 1
                         self.idle_until(min(next_SP_end, time))
                         if time <= next_SP_end:
                             finish = True
@@ -91,8 +97,9 @@ class Card_state:
             if self.wakeup_time <= self.current_time:
                 self.CCA_busy_until(event.end)
             else:
-                if self.wakeup_time < event.end:
+                if self.wakeup_time <= event.end:
                     self.doze_until(self.wakeup_time)
+                    self.nb_switch_doze_to_awake += 1
                     self.CCA_busy_until(event.end)
                 else:
                     self.doze_until(event.end)
@@ -104,6 +111,8 @@ class Card_state:
                     SP_end = self.DL_slot.get_current_SP_end(self.current_time)
                     if event.end <= SP_end:
                         finish = True
+                    if SP_end <= event.end:
+                        self.nb_switch_awake_to_doze += 1
                     self.CCA_busy_until(min(SP_end, event.end))
                 else:
                     next_SP_start = self.DL_slot.get_next_SP_start(self.current_time)
@@ -112,6 +121,7 @@ class Card_state:
                     if event.end <= next_SP_start:
                         finish = True
                     else:
+                        self.nb_switch_doze_to_awake += 1
                         self.CCA_busy_until(min(next_SP_end, event.end))
                         if event.end <= next_SP_end:
                             finish = True
@@ -120,6 +130,11 @@ class Card_state:
     def add_event_sender(self, event):
         self.idle_until(event.start)
         self.Tx_until(event.end)
+        if self.DL_slot is not None:
+            if not self.DL_slot.is_in_SP(event.start):
+                self.nb_switch_doze_to_awake += 1
+            if not self.DL_slot.is_in_SP(event.end):
+                self.nb_switch_awake_to_doze += 1
 
     def add_event_receiver(self, event):
         self.idle_until(event.start)
@@ -132,8 +147,9 @@ class Card_state:
     def switch_to_doze_state(self, wakeup_time):
         assert(self.current_time < wakeup_time)
         assert(wakeup_time - self.current_time > MIN_DOZE_DURATION)
+        if not self.is_dozing(self.current_time):
+            self.nb_switch_awake_to_doze += 1
         self.wakeup_time = wakeup_time
-        # self.add_scheduled_doze((self.current_time - 1, wakeup_time))
             
 
     def is_dozing(self, time):
@@ -243,6 +259,8 @@ class Card_state:
             "Tx": float(self.Tx),
             "CCA_busy": float(self.CCA_busy),
             "idle": float(self.idle),
-            "doze": float(self.doze)
+            "doze": float(self.doze),
+            "Switch awake to doze": self.nb_switch_awake_to_doze,
+            "Switch doze to awake": self.nb_switch_doze_to_awake
         }
         return result
