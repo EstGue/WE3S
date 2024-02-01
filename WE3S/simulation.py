@@ -50,14 +50,18 @@ class Simulation():
         assert(buffer_capacity > 0)
         self.event_handler.set_buffer_capacity_STA(STA_ID, buffer_capacity)
 
-    def toggle_DL_slot(self, STA_ID, first_start, duration, interval):
+    # Possible slot type:
+    # "Static" -> Needs "First start" (float), "Duration" (float), "Interval" (float)
+    # "Dynamic" -> Needs "Start" (table of float), "Duration" (table of float)
+    def toggle_DL_slot(self, STA_ID, slot_type, arg_dict):
+    # def toggle_DL_slot(self, STA_ID, first_start, duration, interval):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
-        assert(duration < interval)
-        assert(first_start < interval)
-        self.event_handler.toggle_DL_slot(STA_ID, first_start, duration, interval)
+        # assert(duration < interval)
+        # assert(first_start < interval)
+        self.event_handler.toggle_DL_slot(STA_ID, slot_type, arg_dict)
 
     # Possible prompt strategies:
-    # "None" -> Needs "Prompt interval"
+    # "None" -> Needs "Prompt interval", optionally "First prompt"
     # "TCP-like" -> Needs "Min prompt interval", "Max prompt interval", "Prompt interval incrementation step",
     # "Objective nb returned frames", "Max nb returned frames"
     def toggle_DL_prompt(self, STA_ID, strategy_name, arg_dict):
@@ -95,7 +99,8 @@ class Simulation():
                 start = sta_dict["DL slot"]["Start"]
                 duration = sta_dict["DL slot"]["Duration"]
                 interval = sta_dict["DL slot"]["Interval"]
-                self.toggle_DL_slot(STA_ID, start, duration, interval)
+                arg_dict = {"First start": start, "Duration": duration, "Interval": interval}
+                self.toggle_DL_slot(STA_ID, "Static", arg_dict)
             if sta_dict["Use DL prompt"]:
                 strategy_name = sta_dict["DL prompt"]["Strategy name"]
                 arg_dict = sta_dict["DL prompt"]
@@ -104,6 +109,7 @@ class Simulation():
                 start = sta_dict["UL slot"]["Start"]
                 duration = sta_dict["UL slot"]["Duration"]
                 interval = sta_dict["UL slot"]["Interval"]
+                arg_dict = {"First start": start, "Duration": duration, "Interval": interval}
                 self.toggle_UL_slot(STA_ID, start, duration, interval)
             if sta_dict["Use UL prompt"]:
                 strategy_name = sta_dict["UL prompt"]["Strategy name"]

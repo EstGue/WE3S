@@ -70,9 +70,9 @@ class STA (Contender):
         if self.use_DL_prompt():
             self.DL_prompt_stream.initialize()
         if DEBUG and self.use_DL_slot():
-            self.timeline.append(self.DL_slot.timeline)
+            self.timeline.append(self.DL_slot.get_timeline())
         if DEBUG and self.use_UL_slot():
-            self.timeline.append(self.UL_slot.timeline)
+            self.timeline.append(self.UL_slot.get_timeline())
             
 
     def verify_initialization(self):

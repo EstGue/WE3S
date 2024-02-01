@@ -103,6 +103,18 @@ class Results():
         self.tot_generated_frames_avg = -1
         self.tot_generated_frames_std = -1
 
+        self.DL_loss_rate_STA = []
+        self.DL_loss_rate_avg = -1
+        self.DL_loss_rate_std = -1
+
+        self.UL_loss_rate_STA = []
+        self.UL_loss_rate_avg = -1
+        self.UL_loss_rate_std = -1
+
+        self.tot_loss_rate_STA = []
+        self.tot_loss_rate_avg = -1
+        self.tot_loss_rate_std = -1
+        
         self.DL_delay_STA = []
         self.DL_delay_avg = -1
         self.DL_delay_std = -1
@@ -142,14 +154,6 @@ class Results():
         self.awake_to_doze_STA = []
         self.awake_to_doze_avg = -1
         self.awake_to_doze_std = -1
-
-        # self.nb_switch_doze_to_awake_STA = []
-        # self.nb_switch_doze_to_awake_avg = -1
-        # self.nb_switch_doze_to_awake_std = -1
-
-        # self.nb_switch_awake_to_doze_STA = []
-        # self.nb_switch_awake_to_doze_avg = -1
-        # self.nb_switch_awake_to_doze_std = -1
         
         self.consumption_STA = []
         self.consumption_avg = -1
@@ -177,6 +181,7 @@ class Results():
         self.compute_ACK()
         self.compute_delay()
         self.compute_generated_frames()
+        self.compute_loss_rate()
         self.compute_counters()
         self.compute_energy_consumption()
 
@@ -445,8 +450,44 @@ class Results():
             self.DL_generated_frames_std = (self.DL_generated_frames_std / self.nb_STAs) **.5
             self.UL_generated_frames_std = (self.UL_generated_frames_std / self.nb_STAs) **.5
             self.tot_generated_frames_std = (self.tot_generated_frames_std / self.nb_STAs) **.5
-                    
-        
+
+
+    def compute_loss_rate(self):
+        if len(self.DL_loss_rate_STA) == 0 or len(self.UL_loss_rate_STA) == 0 or len(self.tot_loss_rate_STA) == 0:
+            self.DL_loss_rate_STA = [0 for i in range(self.nb_STAs)]
+            self.UL_loss_rate_STA = [0 for i in range(self.nb_STAs)]
+            self.tot_loss_rate_STA = [0 for i in range(self.nb_STAs)]
+            self.compute_generated_frames()
+            self.compute_sent_frames()
+            for sta in self.record_data["Events"][self.last_key]["STAs"]:
+                STA_ID = int(sta) - 1 # Minus 1 to get the proper index
+                sta_dict = self.record_data["Events"][self.last_key]["STAs"][sta]
+                DL_pending_frames = sta_dict["DL traffic"]["Pending frames"]
+                DL_OK_frames = self.DL_sent_frames_STA[STA_ID] + DL_pending_frames
+                DL_gen_frames = self.DL_generated_frames_STA[STA_ID]
+                DL_loss_rate = 1 - (DL_OK_frames / DL_gen_frames)
+                self.DL_loss_rate_STA[STA_ID] = DL_loss_rate
+                UL_pending_frames = sta_dict["UL traffic"]["Pending frames"]
+                UL_OK_frames = self.UL_sent_frames_STA[STA_ID] + UL_pending_frames
+                UL_gen_frames = self.UL_generated_frames_STA[STA_ID]
+                UL_loss_rate = 1 - (UL_OK_frames / UL_gen_frames)
+                self.UL_loss_rate_STA[STA_ID] = UL_loss_rate
+                tot_OK_frames = DL_OK_frames + UL_OK_frames
+                tot_gen_frames = DL_gen_frames + UL_gen_frames
+                tot_loss_rate = 1 - (tot_OK_frames / tot_gen_frames)
+                self.tot_loss_rate_STA[STA_ID] = tot_loss_rate
+
+            self.DL_loss_rate_avg = sum(self.DL_loss_rate_STA) / self.nb_STAs
+            self.UL_loss_rate_avg = sum(self.UL_loss_rate_STA) / self.nb_STAs
+            self.tot_loss_rate_avg = sum(self.tot_loss_rate_STA) / self.nb_STAs
+
+            self.DL_loss_rate_std = sum([(x - self.DL_loss_rate_avg)**2 for x in self.DL_loss_rate_STA])
+            self.DL_loss_rate_std = (self.DL_loss_rate_std / self.nb_STAs) **.5
+            self.UL_loss_rate_std = sum([(x - self.UL_loss_rate_avg)**2 for x in self.UL_loss_rate_STA])
+            self.UL_loss_rate_std = (self.UL_loss_rate_std / self.nb_STAs) **.5
+            self.tot_loss_rate_std = sum([(x - self.tot_loss_rate_avg)**2 for x in self.tot_loss_rate_STA])
+            self.tot_loss_rate_std = (self.tot_loss_rate_std / self.nb_STAs) **.5
+                
     def compute_counters(self):
         if len(self.idle_STA) == 0 or len(self.CCA_STA) == 0 or len(self.Rx_STA) == 0 or len(self.Tx_STA) == 0 or len(self.doze_STA) == 0:
             self.get_simulation_duration()
@@ -760,6 +801,27 @@ class Results():
         result["Tot generated frames STA"] = tot_gen
         result["Tot generated frames avg"] = self.tot_generated_frames_avg
         result["Tot generated frames std"] = self.tot_generated_frames_std
+
+        DL_loss = dict()
+        for x,y in enumerate(self.DL_loss_rate_STA):
+            DL_loss[str(x+1)] = y
+        result["DL loss rate STA"] = DL_loss
+        result["DL loss rate avg"] = self.DL_loss_rate_avg
+        result["DL loss rate std"] = self.DL_loss_rate_std
+
+        UL_loss = dict()
+        for x,y in enumerate(self.UL_loss_rate_STA):
+            UL_loss[str(x+1)] = y
+        result["UL loss rate STA"] = UL_loss
+        result["UL loss rate avg"] = self.UL_loss_rate_avg
+        result["UL loss rate std"] = self.UL_loss_rate_std
+
+        tot_loss = dict()
+        for x,y in enumerate(self.tot_loss_rate_STA):
+            tot_loss[str(x+1)] = y
+        result["Tot loss rate STA"] = tot_loss
+        result["Tot loss rate avg"] = self.tot_loss_rate_avg
+        result["Tot loss rate std"] = self.tot_loss_rate_std
 
         DL_delay = dict()
         for x,y in enumerate(self.DL_delay_STA):

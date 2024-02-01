@@ -62,11 +62,13 @@ class Event_handler:
         assert(buffer_capacity > 0)
         self.contenders[STA_ID].buffer_capacity = buffer_capacity
 
-    def toggle_DL_slot(self, STA_ID, first_start, duration, interval):
+    def toggle_DL_slot(self, STA_ID, slot_type, arg_dict):
+    # def toggle_DL_slot(self, STA_ID, first_start, duration, interval):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        assert(duration < interval)
-        assert(first_start < interval)
-        DL_slot = Slot(STA_ID, first_start, duration, interval)
+        # assert(duration < interval)
+        # assert(first_start < interval)
+        # DL_slot = Slot(STA_ID, first_start, duration, interval)
+        DL_slot = Slot(slot_type, arg_dict)
         self.contenders[STA_ID].toggle_DL_slot(DL_slot)
         self.contenders[0].toggle_DL_slot(STA_ID, DL_slot)
 
@@ -79,7 +81,9 @@ class Event_handler:
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
         assert(duration < interval)
         assert(first_start < interval)
-        UL_slot = Slot(STA_ID, first_start, duration, interval)
+        UL_slot = Slot("Static", {"First start": first_start,
+                                  "Duration": duration,
+                                  "Interval": interval})
         self.contenders[STA_ID].toggle_UL_slot(UL_slot)
 
     def toggle_UL_prompt(self, STA_ID, strategy_name, arg_dict):
@@ -228,16 +232,6 @@ class Event_handler:
         all_STA_dict = dict()
         for STA in self.contenders[1:]:
             STA_dict = STA.get_dictionary()
-            # STA_dict = dict()
-            # STA_dict["Datarate"] = STA.wlan.get_link_capacity(STA.ID)
-            # STA_dict["use DL slot"] = STA.use_DL_slot()
-            # STA_dict["use DL prompt"] = STA.use_DL_prompt()
-            # STA_dict["use UL slot"] = STA.use_UL_slot()
-            # STA_dict["use UL prompt"] = STA.use_UL_prompt()
-            # if STA_dict["use DL slot"]:
-            #     STA_dict["DL slot"] = STA.DL_slot.get_dictionary()
-            # if STA_dict["use UL slot"]:
-            #     STA_dict["UL slot"] = STA.UL_slot.get_dictionary()
             all_STA_dict[str(STA.ID)] = STA_dict
 
         result["STAs"] = all_STA_dict

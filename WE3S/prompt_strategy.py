@@ -18,10 +18,14 @@ class Prompt_strategy:
 
 class Prompt_strategy_None (Prompt_strategy):
 
-    def __init__(self, prompt_interval):
+    def __init__(self, prompt_interval, first_prompt=None):
         Prompt_strategy.__init__(self)
         self.prompt_interval = prompt_interval
-        self.next_interval = random.randint(1, 100) * (self.prompt_interval / 100)
+        if first_prompt is None:
+            self.next_interval = random.randint(1, 100) * (self.prompt_interval / 100)
+        else:
+            assert(first_prompt >= 0)
+            self.next_interval = first_prompt
 
     def update_prompt_answer(self, complete_frame_table):
         self.next_interval = self.prompt_interval

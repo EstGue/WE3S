@@ -95,7 +95,8 @@ class Stream:
             if self.slot.is_in_SP(tmp):
                 return -1
             else:
-                transmission_time = self.slot.get_next_SP_start(self.current_time + delay) + SIFS
+                # transmission_time = self.slot.get_next_SP_start(self.current_time + delay) + SIFS
+                transmission_time = self.slot.get_next_SP_start(self.current_time + delay)
                 assert(self.slot.is_in_SP(transmission_time))
                 return transmission_time
         else:
@@ -104,8 +105,16 @@ class Stream:
             if self.slot.is_in_SP(transmission_time):
                 return transmission_time
             else:
-                revised_transmission_time = self.slot.get_next_SP_start(transmission_time) + SIFS
-                assert(self.slot.is_in_SP(revised_transmission_time))
+                # revised_transmission_time = self.slot.get_next_SP_start(transmission_time) + SIFS
+                revised_transmission_time = self.slot.get_next_SP_start(transmission_time)
+                if not self.slot.is_in_SP(revised_transmission_time):
+                    print(f"{Fore.RED}The scheduled transmission is not in a SP")
+                    print("Scheduled transmission time: ", revised_transmission_time)
+                    print("Current slot start: ", self.slot.get_current_SP_start(revised_transmission_time))
+                    print("Current slot end: ", self.slot.get_current_SP_end(revised_transmission_time))
+                    print("Next SP start: ", self.slot.get_next_SP_start(revised_transmission_time))
+                    print(f"{Style.RESET_ALL}")
+                    assert(False)
                 return revised_transmission_time
 
     def get_oldest_creation_time(self):
@@ -249,7 +258,10 @@ class Prompt_stream(Stream):
 
     def set_strategy(self, strategy_name, arg_dict):
         if strategy_name == "None":
-            self.prompt_strategy = Prompt_strategy_None(arg_dict["Prompt interval"])
+            if "First prompt" in arg_dict:
+                self.prompt_strategy = Prompt_strategy_None(arg_dict["Prompt interval"], arg_dict["First prompt"])
+            else:
+                self.prompt_strategy = Prompt_strategy_None(arg_dict["Prompt interval"])                
         elif strategy_name == "TCP-like":
             self.prompt_strategy = Prompt_strategy_TCP_like(arg_dict["Min prompt interval"],
                                                             arg_dict["Max prompt interval"],

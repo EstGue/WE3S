@@ -155,6 +155,8 @@ class Card_state:
 
 
     def update_next_scheduled_transmission(self, next_scheduled_transmission):
+        if next_scheduled_transmission is None:
+            return
         assert(self.current_time < next_scheduled_transmission or next_scheduled_transmission < 0)
         self.next_scheduled_transmission = next_scheduled_transmission
 
