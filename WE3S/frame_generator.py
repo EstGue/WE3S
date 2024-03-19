@@ -36,7 +36,7 @@ class Frame_generator:
     def load_next_frame(self):
         self.frame_counter += 1
         self.total_generated_data += self.current_frame.size
-    
+
     def get_dictionary(self):
         return {
             "Sender ID": self.sender_ID,

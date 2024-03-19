@@ -144,14 +144,32 @@ class Card_state:
             else:
                 self.CCA_busy_until(event.end)
         elif self.next_scheduled_transmission < 0:
-            self.idle_until(event.start)
+            while self.current_time < event.start:
+                if self.DL_slot.is_in_SP(self.current_time):
+                    SP_end = self.DL_slot.get_current_SP_end(self.current_time)
+                    self.idle_until(min(event.start, SP_end))
+                else:
+                    next_SP_start = self.DL_slot.get_next_SP_start(self.current_time)
+                    stop = min(next_SP_start, event.start)
+                    if self.current_state != "doze" and stop - self.current_time < MIN_DOZE_DURATION:
+                        self.idle_until(stop)
+                    elif self.current_state == "doze":
+                        self.doze_until(stop)
+                    elif stop - self.current_time >= MIN_DOZE_DURATION:
+                        self.doze_until(stop)
             if event.is_sender(self.STA_ID):
                 self.Tx_until(event.end)
             elif event.is_receiver(self.STA_ID) and not event.is_collision():
-                assert(self.DL_slot.is_in_SP(event.start))
                 self.Rx_until(event.end)
             else:
-                self.CCA_busy_until(event.end)
+                if self.DL_slot.is_in_SP(event.start):
+                    SP_end = self.DL_slot.get_current_SP_end(event.start)
+                    self.CCA_busy_until(min(event.end, SP_end))
+                    self.doze_until(event.end)
+                else:
+                    next_SP_start = self.DL_slot.get_next_SP_start(self.current_time)
+                    self.doze_until(min(event.end, next_SP_start))
+                    self.CCA_busy_until(event.end)
 
 
     def update_next_scheduled_transmission(self, next_scheduled_transmission):

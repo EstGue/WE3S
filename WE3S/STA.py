@@ -151,10 +151,8 @@ class STA (Contender):
         is_ACK = len(frame_table) == 1 and frame_table[0].label == "ACK"
         total_size = sum([frame.size for frame in frame_table])
         total_size += MAC_HEADER_SIZE
-        if not is_ACK:
-            total_size += ACK_SIZE
-        event_duration = Timestamp(total_size / data_rate)
-        event_duration += PHY_HEADER_DURATION
+        event_duration = PHY_HEADER_DURATION
+        event_duration += Timestamp(total_size / data_rate)
         if not is_ACK:
             event_duration += ACK_DURATION
         return event_duration

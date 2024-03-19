@@ -118,6 +118,9 @@ class Event_handler:
         if len(earliest_events) == 0:
             # This point should be never reached.
             self.next_event = Event(self.current_time + 0.1, 0, None)
+        elif self.current_time + SIMULATION_TIME_STEP < earliest_events[0].start:
+            # Ensures that the contenders update themselves regularly, even if there are no event
+            self.next_event = Event(self.current_time + SIMULATION_TIME_STEP, 0, [])
         elif len(earliest_events) == 1:
             # Error on the frame
             self.next_event = earliest_events[0]

@@ -58,11 +58,11 @@ class Results():
         self.error_rate_AP = -1
         self.error_rate_STA_avg = -1
         self.error_rate_STA_std = -1
-        
+
         self.DL_throughput_STA = []
         self.DL_throughput_avg = -1
         self.DL_throughput_std = -1
-        
+
         self.UL_throughput_STA = []
         self.UL_throughput_avg = -1
         self.UL_throughput_std = -1
@@ -246,7 +246,7 @@ class Results():
 
     def get_number_of_events(self):
         if self.nb_events == -1:
-            self.nb_events = len(self.record_data)
+            self.nb_events = len(self.record_data["Events"])
 
     def get_datarate(self):
         if len(self.datarate_STA) == 0 or self.datarate_avg == -1 or self.datarate_std == -1:
