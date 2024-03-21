@@ -39,13 +39,13 @@ class Event_handler:
             ap.add_STA(sta)
 
 
-    def set_DL_traffic(self, STA_ID, traffic_type, arg_dict):
+    def add_DL_traffic(self, STA_ID, traffic_type, arg_dict, label, start, end):
         assert(STA_ID > 0 and STA_ID <= len(self.contenders))
-        self.contenders[0].set_DL_traffic(STA_ID, traffic_type, arg_dict)
+        self.contenders[0].add_DL_traffic(STA_ID, traffic_type, arg_dict, label, start, end)
 
-    def set_UL_traffic(self, STA_ID, traffic_type, arg_dict):
+    def add_UL_traffic(self, STA_ID, traffic_type, arg_dict, label, start, end):
         assert(STA_ID > 0 and STA_ID <= len(self.contenders))
-        self.contenders[STA_ID].set_UL_traffic(traffic_type, arg_dict)
+        self.contenders[STA_ID].add_UL_traffic(traffic_type, arg_dict, label, start, end)
 
     def set_link_capacity(self, STA_ID, link_capacity):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
@@ -65,9 +65,6 @@ class Event_handler:
     def toggle_DL_slot(self, STA_ID, slot_type, arg_dict):
     # def toggle_DL_slot(self, STA_ID, first_start, duration, interval):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        # assert(duration < interval)
-        # assert(first_start < interval)
-        # DL_slot = Slot(STA_ID, first_start, duration, interval)
         DL_slot = Slot(slot_type, arg_dict)
         self.contenders[STA_ID].toggle_DL_slot(DL_slot)
         self.contenders[0].toggle_DL_slot(STA_ID, DL_slot)
@@ -183,15 +180,15 @@ class Event_handler:
             DL_traffic_index = self.contenders[0].stream_information[str(STA_ID)]["DL Tx index"]
             DL_traffic = self.contenders[0].stream_table[DL_traffic_index]
             DL_traffic_dict = {
-                "Frame counter": DL_traffic.frame_generator.frame_counter,
-                "Generated data": DL_traffic.frame_generator.total_generated_data,
+                "Frame counter": DL_traffic.frame_generator.get_frame_counter(),
+                "Generated data": DL_traffic.frame_generator.get_total_generated_data(),
                 "Pending frames": len(DL_traffic.pending_frame_table)
             }
             STA_dict["DL traffic"] = DL_traffic_dict
             UL_traffic = self.contenders[STA_ID].UL_data_stream
             UL_traffic_dict = {
-                "Frame counter": UL_traffic.frame_generator.frame_counter,
-                "Generated data": UL_traffic.frame_generator.total_generated_data,
+                "Frame counter": UL_traffic.frame_generator.get_frame_counter(),
+                "Generated data": UL_traffic.frame_generator.get_total_generated_data(),
                 "Pending frames": len(UL_traffic.pending_frame_table)
             }
             STA_dict["UL traffic"] = UL_traffic_dict

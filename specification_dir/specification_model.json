@@ -7,14 +7,28 @@
 	"1": {
 	    "Datarate": 100000000,
 	    "DL traffic": {
-		"Type": "Constant",
-		"Frame size": 11520,
-		"Frame interval": 0.01
+		"Traffic label": {
+		
+		    "Type": "Constant",
+		    "Frame size": 11520,
+		    "Frame interval": 0.01,
+		    "Start": 1,
+		    "End": 5
+		},
+		"Traffic label 2": {
+		    "Type": "Constant",
+		    "Frame size": 10000,
+		    "Frame interval": 0.1,
+		    "Start": 4,
+		    "End": null
+		}
 	    },
 	    "UL traffic": {
-		"Type": "Poisson",
-		"Frame size": 11520,
-		"Frame interval": 0.01
+		"Traffic label": {
+		    "Type": "Poisson",
+		    "Frame size": 11520,
+		    "Frame interval": 0.01
+		}
 	    },
 	    "Buffer capacity": 20,
 	    "Use DL slot": false,
@@ -43,15 +57,20 @@
 	"2": {
 	    "Datarate": 100000000,
 	    "DL traffic": {
-		"Type": "Hyperexponential",
-		"Frame size": 11520,
-		"Frame interval 1": 0.01,
-		"Frame interval 2": 0.001,
-		"Probability": 0.9
+		"Traffic label": {
+		    "Type": "Hyperexponential",
+		    "Frame size": 11520,
+		    "Frame interval 1": 0.01,
+		    "Frame interval 2": 0.001,
+		    "Probability": 0.9
+		}
 	    },
 	    "UL traffic": {
-		"Type": "Trace",
-		"Trace filename": "specification_dir/trace_example.txt"
+		"Traffic label": {
+		    "Type": "Trace",
+		    "Trace filename": "specification_dir/trace_example.txt",
+		    "End": 5
+		}
 	    },
 	    "Buffer capacity": 20,
 	    "Use DL slot": false,

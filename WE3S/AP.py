@@ -20,7 +20,7 @@ class AP(Contender):
 
     def add_STA(self, sta):
         datastream_index = len(self.stream_table)
-        self.stream_table.append(Data_stream(None))
+        self.stream_table.append(Data_stream(0, sta.ID))
         self.stream_information[str(sta.ID)] = dict()
         self.stream_information[str(sta.ID)]["DL Tx index"] = datastream_index
         self.stream_information[str(sta.ID)]["use DL slot"] = False
@@ -41,9 +41,9 @@ class AP(Contender):
             self.stream_table.append(Prompt_stream(sta.UL_prompt_interval, 0, sta.ID, "UL prompt"))
             self.stream_information[str(sta.ID)]["UL prompt index"] = prompt_stream_index
 
-    def set_DL_traffic(self, STA_ID, traffic_type, arg_dict):
+    def add_DL_traffic(self, STA_ID, traffic_type, arg_dict, label, start, end):
         stream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
-        self.stream_table[stream_index].set_traffic(0, STA_ID, "DL Tx", traffic_type, arg_dict)
+        self.stream_table[stream_index].add_traffic(label, traffic_type, arg_dict, start, end)
 
     def toggle_DL_slot(self, STA_ID, DL_slot):
         self.stream_information[str(STA_ID)]["use DL slot"] = True

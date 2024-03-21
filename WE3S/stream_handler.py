@@ -22,7 +22,7 @@ class Stream:
 ### INITIALIZATION and related functions
 
     def initialize(self):
-        self.scheduled_frame = self.frame_generator.get_frame()
+        self.scheduled_frame = self.frame_generator.get_current_frame()
 
     def use_slot(self):
         return self.slot is not None
@@ -158,7 +158,7 @@ class Stream:
 
     def load_next_scheduled_frame(self):
         self.frame_generator.load_next_frame()
-        self.scheduled_frame = self.frame_generator.get_frame()
+        self.scheduled_frame = self.frame_generator.get_current_frame()
 
 
     def update_time(self, current_time):
@@ -202,37 +202,39 @@ class Stream:
 
     def get_dictionary(self):
         return self.frame_generator.get_dictionary()
-        
+
 
 class Data_stream(Stream):
 
-    def __init__(self, frame_generator):
+    def __init__(self, sender_ID, receiver_ID):
         Stream.__init__(self)
-        self.frame_generator = frame_generator
+        self.frame_generator = Aggregated_frame_generator(sender_ID, receiver_ID)
 
-    def set_traffic(self, sender_ID, receiver_ID, label, traffic_type, arg_dict):
-        if traffic_type == "Constant":
-            frame_size = arg_dict["Frame size"]
-            frame_interval = arg_dict["Frame interval"]
-            self.frame_generator = Constant_frame_generator(sender_ID, receiver_ID, label, frame_interval, frame_size)
-        elif traffic_type == "Poisson":
-            frame_size = arg_dict["Frame size"]
-            frame_interval = arg_dict["Frame interval"]
-            self.frame_generator = Poisson_frame_generator(sender_ID, receiver_ID, label, frame_interval, frame_size)
-        elif traffic_type == "Hyperexponential":
-            frame_size = arg_dict["Frame size"]
-            frame_interval_1 = arg_dict["Frame interval 1"]
-            frame_interval_2 = arg_dict["Frame interval 2"]
-            probability = arg_dict["Probability"]
-            self.frame_generator = Hyperexponential_frame_generator(sender_ID, receiver_ID, label, frame_size,
-                                                                       frame_interval_1, frame_interval_2, probability)
-        elif traffic_type == "Trace":
-            trace_filename = arg_dict["Trace filename"]
-            self.frame_generator = Frame_generator_from_trace_file(sender_ID, receiver_ID, label, trace_filename)
-        else:
-            print(f"{Fore.RED}ERROR: this traffic type does not exist:", traffic_type)
-            print(f"{Style.RESET_ALL}")
-            assert(0)
+    def add_traffic(self, label, traffic_type, arg_dict, start, end):
+        self.frame_generator.add_frame_generator(label, traffic_type, arg_dict, start, end)
+        self.initialize()
+        # if traffic_type == "Constant":
+        #     frame_size = arg_dict["Frame size"]
+        #     frame_interval = arg_dict["Frame interval"]
+        #     # self.frame_generator = Constant_frame_generator(sender_ID, receiver_ID, label, frame_interval, frame_size)
+        # elif traffic_type == "Poisson":
+        #     frame_size = arg_dict["Frame size"]
+        #     frame_interval = arg_dict["Frame interval"]
+        #     # self.frame_generator = Poisson_frame_generator(sender_ID, receiver_ID, label, frame_interval, frame_size)
+        # elif traffic_type == "Hyperexponential":
+        #     frame_size = arg_dict["Frame size"]
+        #     frame_interval_1 = arg_dict["Frame interval 1"]
+        #     frame_interval_2 = arg_dict["Frame interval 2"]
+        #     probability = arg_dict["Probability"]
+        #     self.frame_generator = Hyperexponential_frame_generator(sender_ID, receiver_ID, label, frame_size,
+        #                                                                frame_interval_1, frame_interval_2, probability)
+        # elif traffic_type == "Trace":
+        #     trace_filename = arg_dict["Trace filename"]
+        #     self.frame_generator = Frame_generator_from_trace_file(sender_ID, receiver_ID, label, trace_filename)
+        # else:
+        #     print(f"{Fore.RED}ERROR: this traffic type does not exist:", traffic_type)
+        #     print(f"{Style.RESET_ALL}")
+        #     assert(0)
 
 
 
@@ -299,7 +301,7 @@ class Prompt_stream(Stream):
             return
         else:
             print(f"{Fore.RED}The frame does not belong to this stream")
-            print(frame.get_dictionary(), f"Style.RESET_ALL")
+            print(frame.get_dictionary(), f"{Style.RESET_ALL}")
             assert(0)
 
     def set_prompt_answer(self, complete_frame_table):
@@ -352,8 +354,12 @@ class Beacon_stream(Stream):
     def __init__(self):
         Stream.__init__(self)
         self.priority = 1
-        self.frame_generator = Constant_frame_generator(0, 0, "beacon", TBTT, BEACON_SIZE)
-
+        self.frame_generator = Aggregated_frame_generator(0, 0, "HIGH")
+        self.frame_generator.add_frame_generator("beacon", "CBR",
+                                                 {"Frame size":BEACON_SIZE, "Frame interval": TBTT},
+                                                 None, None)
+        self.scheduled_frame = self.frame_generator.get_current_frame()
+        
     def update_time(self, current_time):
         Stream.update_time(self, current_time)
         if len(self.pending_frame_table) != 0:

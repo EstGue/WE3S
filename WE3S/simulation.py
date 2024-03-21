@@ -27,14 +27,14 @@ class Simulation():
     # "Poisson" -> needs "Frame size", "Frame interval"
     # "Hyperexponential" -> needs "Frame size", "Frame interval 1", "Frame interval 2", "Probability"
     # "Trace" -> "Trace filename"
-    def set_DL_traffic(self, STA_ID, traffic_type, arg_dict):
+    def add_DL_traffic(self, STA_ID, traffic_type, arg_dict, label="DL Tx", start=None, end=None):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
-        self.event_handler.set_DL_traffic(STA_ID, traffic_type, arg_dict)
+        self.event_handler.add_DL_traffic(STA_ID, traffic_type, arg_dict, label, start, end)
 
     # See set_DL_traffic to get possible traffic types.
-    def set_UL_traffic(self, STA_ID, traffic_type, arg_dict):
+    def add_UL_traffic(self, STA_ID, traffic_type, arg_dict, label="UL Tx", start=None, end=None):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
-        self.event_handler.set_UL_traffic(STA_ID, traffic_type, arg_dict)        
+        self.event_handler.add_UL_traffic(STA_ID, traffic_type, arg_dict, label, start, end)
 
     def set_link_capacity(self, STA_ID, link_capacity):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
@@ -56,8 +56,6 @@ class Simulation():
     def toggle_DL_slot(self, STA_ID, slot_type, arg_dict):
     # def toggle_DL_slot(self, STA_ID, first_start, duration, interval):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
-        # assert(duration < interval)
-        # assert(first_start < interval)
         self.event_handler.toggle_DL_slot(STA_ID, slot_type, arg_dict)
 
     # Possible prompt strategies:
@@ -92,8 +90,28 @@ class Simulation():
             STA_ID = int(sta)
             sta_dict = spec_dict["STAs"][sta]
             self.set_link_capacity(STA_ID, sta_dict["Datarate"])
-            self.set_DL_traffic(STA_ID, sta_dict["DL traffic"]["Type"], sta_dict["DL traffic"])
-            self.set_UL_traffic(STA_ID, sta_dict["UL traffic"]["Type"], sta_dict["UL traffic"])
+            for traffic in sta_dict["DL traffic"]:
+                traffic_dict = sta_dict["DL traffic"][traffic]
+                traffic_type = traffic_dict["Type"]
+                traffic_start = None
+                if "Start" in traffic_dict:
+                    traffic_start = traffic_dict["Start"]
+                traffic_end = None
+                if "End" in traffic_dict:
+                    traffic_end = traffic_dict["End"]
+                self.add_DL_traffic(STA_ID, traffic_type, traffic_dict,
+                                    traffic, traffic_start, traffic_end)
+            for traffic in sta_dict["UL traffic"]:
+                traffic_dict = sta_dict["UL traffic"][traffic]
+                traffic_type = traffic_dict["Type"]
+                traffic_start = None
+                if "Start" in traffic_dict:
+                    traffic_start = traffic_dict["Start"]
+                traffic_end = None
+                if "End" in traffic_dict:
+                    traffic_end = traffic_dict["End"]
+                self.add_UL_traffic(STA_ID, traffic_type, traffic_dict,
+                                    traffic, traffic_start, traffic_end)
             self.set_buffer_capacity_STA(STA_ID, sta_dict["Buffer capacity"])
             if sta_dict["Use DL slot"]:
                 start = sta_dict["DL slot"]["Start"]

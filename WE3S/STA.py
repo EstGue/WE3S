@@ -7,7 +7,7 @@ class STA (Contender):
     def __init__(self, ID):
         Contender.__init__(self, ID)
 
-        self.UL_data_stream = Data_stream(None)
+        self.UL_data_stream = Data_stream(self.ID, 0)
         self.DL_prompt_stream = None
         self.DL_prompt_answer = []
 
@@ -22,9 +22,9 @@ class STA (Contender):
 
 ### INITIALIZATION and related functions
 
-    def set_UL_traffic(self, traffic_type, arg_dict):
-        self.UL_data_stream.set_traffic(self.ID, 0, "UL Tx", traffic_type, arg_dict)
-        
+    def add_UL_traffic(self, traffic_type, arg_dict, label, start, end):
+        self.UL_data_stream.add_traffic(label, traffic_type, arg_dict, start, end)
+
     def use_DL_slot(self):
         return self.DL_slot is not None
 
