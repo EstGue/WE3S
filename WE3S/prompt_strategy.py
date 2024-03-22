@@ -36,7 +36,7 @@ class Prompt_strategy_None (Prompt_strategy):
             "Prompt interval": self.prompt_interval
         }
 
-class Prompt_strategy_TCP_like (Prompt_strategy):
+class Prompt_strategy_AIMD (Prompt_strategy):
 
     def __init__(self, min_prompt_interval, max_prompt_interval, prompt_interval_incrementation_step,
                  objective_nb_returned_frames, max_nb_returned_frames):
@@ -66,7 +66,7 @@ class Prompt_strategy_TCP_like (Prompt_strategy):
 
     def get_dictionary(self):
         return {
-            "Strategy name": "TCP-like",
+            "Strategy name": "AIMD",
             "Min prompt interval": self.min_prompt_interval,
             "Max prompt interval": self.max_prompt_interval,
             "Prompt interval incrementation step": self.prompt_interval_incrementation_step,

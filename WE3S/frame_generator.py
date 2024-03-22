@@ -164,8 +164,6 @@ class Frame_generator_CBR:
         self.init_first_frame()
 
     def get_current_frame(self):
-        if self.label != "beacon":
-            print("Current frame", self.current_frame)
         return self.current_frame
 
     def get_current_frame_time(self):
@@ -209,5 +207,234 @@ class Frame_generator_CBR:
                 self.next_frame_time = -1
             
 
-# class Frame_generator_Poisson:
+class Frame_generator_Poisson:
+
+    def __init__(self, label, arg_dict, start, end):
+        self.label = label
+
+        assert("Frame size" in arg_dict)
+        self.frame_size = arg_dict["Frame size"]
+        assert("Frame interval" in arg_dict)
+        self.frame_interval = arg_dict["Frame interval"]
+        self.first_frame_time = Timestamp((random.randint(1, 100) / 100) * float(self.frame_interval))
+
+        if start is not None and end is not None:
+            assert(start < end)
+        self.generation_start = start
+        self.generation_end = end
+
+        self.current_frame = None
+        self.next_frame_time = None
+
+        self.frame_counter = 0
+        self.total_generated_data = 0
+        self.init_first_frame()
+
+
+    def get_current_frame(self):
+        return self.current_frame
+
+    def get_current_frame_time(self):
+        if self.current_frame is not None:
+            return self.current_frame.creation_time
+        else:
+            return -1
+
+    def get_next_frame_time(self):
+        return self.next_frame_time
+
+    def load_next_frame(self):
+        assert(self.next_frame_time is not None)
+        if self.next_frame_time == -1:
+            self.current_frame = None
+        else:
+            self.current_frame = Frame(self.next_frame_time, None, None,
+                                       self.label, None, self.frame_size)
+            self.frame_counter += 1
+            self.total_generated_data += self.frame_size
+            self.next_frame_time += random.exponential(self.frame_interval, size=1)[0]
+            if self.generation_end is not None and self.next_frame_time > self.generation_end:
+                self.next_frame_time = -1
     
+
+    def init_first_frame(self):
+        current_frame_time = self.first_frame_time
+        if self.generation_start is not None:
+            while current_frame_time < self.generation_start:
+                current_frame_time += self.frame_interval
+
+        if self.generation_end is not None and current_frame_time > self.generation_end:
+            self.current_frame = None
+            self.next_frame_time = -1
+        else:
+            self.current_frame = Frame(current_frame_time, None, None,
+                                       self.label, None, self.frame_size)
+            self.frame_counter += 1
+            self.total_generated_data += self.frame_size
+            self.next_frame_time = current_frame_time
+            self.next_frame_time += random.exponential(self.frame_interval, size=1)[0]
+            if self.generation_end is not None and self.next_frame_time > self.generation_end:
+                self.next_frame_time = -1
+
+
+
+class Frame_generator_hyperexponential:
+
+    def __init__(self, label, arg_dict, start, end):
+        self.label = label
+        
+        assert("Frame size" in arg_dict)
+        self.frame_size = arg_dict["Frame size"]
+        assert("Frame interval 1" in arg_dict)
+        self.frame_interval_1 = arg_dict["Frame interval 1"]
+        assert("Frame interval 2" in arg_dict)
+        self.frame_interval_2 = arg_dict["Frame interval 2"]
+        assert("Probability" in arg_dict)
+        self.probability = arg_dict["Probability"]
+        self.first_frame_time = Timestamp((random.randint(1, 100) / 100) * float(self.frame_interval_1))
+
+        if start is not None and end is not None:
+            assert(start < end)
+        self.generation_start = start
+        self.generation_end = end
+
+        self.current_frame = None
+        self.next_frame_time = None
+
+        self.frame_counter = 0
+        self.total_generated_data = 0
+        self.init_first_frame()
+
+    def get_current_frame(self):
+        return self.current_frame
+
+    def get_current_frame_time(self):
+        if self.current_frame is not None:
+            return self.current_frame.creation_time
+        else:
+            return -1
+
+    def get_next_frame_time(self):
+        return self.next_frame_time
+        
+    def load_next_frame(self):
+        assert(self.next_frame_time is not None)
+        if self.next_frame_time == -1:
+            self.current_frame = None
+        else:
+            self.current_frame = Frame(self.next_frame_time, None, None,
+                                       self.label, None, self.frame_size)
+            self.frame_counter += 1
+            self.total_generated_data += self.frame_size
+            if random.binomial(size=1, n=1, p=self.probability):
+                self.next_frame_time += random.exponential(self.frame_interval_1, size=1)[0]
+            else:
+                self.next_frame_time += random.exponential(self.frame_interval_2, size=1)[0]
+            if self.generation_end is not None and self.next_frame_time > self.generation_end:
+                self.next_frame_time = -1
+
+    def init_first_frame(self):
+        current_frame_time = self.first_frame_time
+        if self.generation_start is not None:
+            while current_frame_time < self.generation_start:
+                current_frame_time += self.frame_interval_1
+
+        if self.generation_end is not None and current_frame_time > self.generation_end:
+            self.current_frame = None
+            self.next_frame_time = -1
+        else:
+            self.current_frame = Frame(current_frame_time, None, None,
+                                       self.label, None, self.frame_size)
+            self.frame_counter += 1
+            self.total_generated_data += self.frame_size
+            self.next_frame_time = current_frame_time
+            if random.binomial(size=1, n=1, p=self.probability):
+                self.next_frame_time += random.exponential(self.frame_interval_1, size=1)[0]
+            else:
+                self.next_frame_time += random.exponential(self.frame_interval_2, size=1)[0]
+            if self.generation_end is not None and self.next_frame_time > self.generation_end:
+                self.next_frame_time = -1
+
+
+
+class Frame_generator_trace:
+
+    def __init__(self, label, arg_dict, start, end):
+        self.label = label
+        
+        assert("Trace filename" in arg_dict)
+        self.trace_file = open(arg_dict["Trace filename"], "r")
+        self.time_offset = 0
+
+        if start is not None and end is not None:
+            assert(start < end)
+        self.generation_start = start
+        self.generation_end = end
+
+        self.current_frame = None
+        self.next_frame = None
+
+        self.frame_counter = 0
+        self.total_generated_data = 0
+        self.init_first_frame()
+
+    def get_current_frame(self):
+        return self.current_frame
+
+    def get_current_frame_time(self):
+        if self.current_frame is not None:
+            return self.current_frame.creation_time
+        else:
+            return -1
+
+    def get_next_frame_time(self):
+        if self.next_frame is not None:
+            return self.next_frame.creation_time
+        else:
+            return -1
+
+    def load_next_frame(self):
+        self.current_frame = self.next_frame
+        if self.current_frame is None:
+            self.next_frame = None
+            return
+        line = self.trace_file.readline()
+        if len(line) == 0:
+            self.trace_file.seek(0)
+            self.time_offset += self.get_current_frame_time()
+            line = self.trace_file.readline()
+        creation_time = Timestamp(self.time_offset + float(line.split(" ")[0]))
+        size = int(line.split(" ")[1])
+        label = line.split(" ")[2]
+        if self.generation_end is not None and creation_time > self.generation_end:
+            self.next_frame = None
+            return
+        self.next_frame = Frame(creation_time, None, None, label, None, size)
+
+
+    def init_first_frame(self):
+        if self.generation_start is not None:
+            self.time_offset = self.generation_start
+        line = self.trace_file.readline()
+        creation_time = Timestamp(self.time_offset + float(line.split(" ")[0]))
+        size = int(line.split(" ")[1])
+        label = line.split(" ")[2]
+        if self.generation_end is not None and creation_time > self.generation_end:
+            self.current_frame = None
+            self.next_frame = None
+            return
+        self.current_frame = Frame(creation_time, None, None, label, None, size)
+        self.frame_counter += 1
+        self.total_generated_data += size
+        line = self.trace_file.readline()
+        if len(line) == 0:
+            self.trace_file.seek(0)
+            self.time_offset += self.get_current_frame_time()
+            line = self.trace_file.readline()
+        creation_time = Timestamp(self.time_offset + float(line.split(" ")[0]))
+        size = int(line.split(" ")[1])
+        label = line.split(" ")[2]
+        if self.generation_end is not None and creation_time > self.generation_end:
+            self.next_frame = None
+            return
+        self.next_frame = Frame(creation_time, None, None, label, None, size)

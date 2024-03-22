@@ -8,15 +8,14 @@
 	    "Datarate": 100000000,
 	    "DL traffic": {
 		"Traffic label": {
-		
-		    "Type": "Constant",
+		    "Type": "CBR",
 		    "Frame size": 11520,
 		    "Frame interval": 0.01,
 		    "Start": 1,
 		    "End": 5
 		},
 		"Traffic label 2": {
-		    "Type": "Constant",
+		    "Type": "CBR",
 		    "Frame size": 10000,
 		    "Frame interval": 0.1,
 		    "Start": 4,
@@ -69,12 +68,12 @@
 		"Traffic label": {
 		    "Type": "Trace",
 		    "Trace filename": "specification_dir/trace_example.txt",
-		    "End": 5
+		    "Start": 5
 		}
 	    },
 	    "Buffer capacity": 20,
 	    "Use DL slot": false,
-	    "Use DL prompt": true,
+	    "Use DL prompt": false,
 	    "Use UL slot": false,
 	    "Use UL prompt": false,
 	    "DL slot": {
@@ -83,7 +82,7 @@
 		"Interval": 0.1
 	    },
 	    "DL prompt": {
-		"Strategy name": "TCP-like",
+		"Strategy name": "AIMD",
 		"Min prompt interval": 0.001,
 		"Max prompt interval": 10,
 		"Prompt interval incrementation step": 0.001,
