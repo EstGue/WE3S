@@ -62,34 +62,35 @@ class Event_handler:
         assert(buffer_capacity > 0)
         self.contenders[STA_ID].buffer_capacity = buffer_capacity
 
-    def toggle_DL_slot(self, STA_ID, slot_type, arg_dict):
-    # def toggle_DL_slot(self, STA_ID, first_start, duration, interval):
+    def initialize_DL_slot(self, STA_ID, slot_type, arg_dict):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
         DL_slot = Slot(slot_type, arg_dict)
-        self.contenders[STA_ID].toggle_DL_slot(DL_slot)
-        self.contenders[0].toggle_DL_slot(STA_ID, DL_slot)
+        self.contenders[STA_ID].initialize_DL_slot(DL_slot)
+        self.contenders[0].initialize_DL_slot(STA_ID, DL_slot)
 
-    def toggle_DL_prompt(self, STA_ID, strategy_name, arg_dict):
+    def initialize_DL_prompt(self, STA_ID, strategy_name, arg_dict):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        self.contenders[STA_ID].toggle_DL_prompt(strategy_name, arg_dict)
-        self.contenders[0].toggle_DL_prompt(STA_ID)
+        arg_dict["Event handler"] = self
+        arg_dict["STA ID"] = STA_ID
+        self.contenders[STA_ID].initialize_DL_prompt(strategy_name, arg_dict)
+        self.contenders[0].initialize_DL_prompt(STA_ID)
 
-    def toggle_UL_slot(self, STA_ID, first_start, duration, interval):
+    def initialize_UL_slot(self, STA_ID, first_start, duration, interval):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
         assert(duration < interval)
         assert(first_start < interval)
         UL_slot = Slot("Static", {"First start": first_start,
                                   "Duration": duration,
                                   "Interval": interval})
-        self.contenders[STA_ID].toggle_UL_slot(UL_slot)
+        self.contenders[STA_ID].initialize_UL_slot(UL_slot)
 
-    def toggle_UL_prompt(self, STA_ID, strategy_name, arg_dict):
+    def initialize_UL_prompt(self, STA_ID, strategy_name, arg_dict):
         assert(STA_ID > 0 and STA_ID < len(self.contenders))
-        self.contenders[STA_ID].toggle_UL_prompt()
-        self.contenders[0].toggle_UL_prompt(STA_ID, strategy_name, arg_dict)
+        self.contenders[STA_ID].initialize_UL_prompt()
+        self.contenders[0].initialize_UL_prompt(STA_ID, strategy_name, arg_dict)
 
 
-    def deactivate_random_error_on_frame(self):
+    def disable_random_error_on_frame(self):
         self.PER = None
 
     ## HANDLE EVENTS
@@ -225,7 +226,20 @@ class Event_handler:
                 if event.start == earliest_start:
                     earliest_events.append(event)
             return earliest_events
-    
+
+
+    def disable_DL_prompt(self, STA_ID):
+        assert(STA_ID > 0 and STA_ID <= len(self.contenders))
+        self.contenders[0].disable_DL_prompt(STA_ID)
+        self.contenders[STA_ID].disable_DL_prompt()
+
+    def enable_DL_prompt(self, STA_ID):
+        assert(STA_ID > 0 and STA_ID <= len(self.contenders))
+        self.contenders[0].enable_DL_prompt(STA_ID)
+        self.contenders[STA_ID].enable_DL_prompt()
+
+        
+    ## GET END RESULTS
 
     def get_record(self):
         result = dict()
@@ -238,4 +252,5 @@ class Event_handler:
         result["Events"] = self.record.get_dictionary()
         
         return result
+
 

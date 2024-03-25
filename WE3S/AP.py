@@ -29,10 +29,10 @@ class AP(Contender):
         self.stream_information[str(sta.ID)]["use UL prompt"] = False
         if sta.use_DL_slot():
             self.stream_information[str(sta.ID)]["use DL slot"] = True
-            self.stream_table[datastream_index].toggle_DL_slot(sta.DL_slot)
+            self.stream_table[datastream_index].initialize_DL_slot(sta.DL_slot)
         if sta.use_DL_prompt():
             self.stream_information[str(sta.ID)]["use DL prompt"] = True
-            self.stream_table[datastream_index].toggle_DL_prompt()
+            self.stream_table[datastream_index].initialize_DL_prompt()
         if sta.use_UL_slot():
             self.stream_information[str(sta.ID)]["use UL slot"] = True
         if sta.use_UL_prompt():
@@ -45,23 +45,23 @@ class AP(Contender):
         stream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
         self.stream_table[stream_index].add_traffic(label, traffic_type, arg_dict, start, end)
 
-    def toggle_DL_slot(self, STA_ID, DL_slot):
+    def initialize_DL_slot(self, STA_ID, DL_slot):
         self.stream_information[str(STA_ID)]["use DL slot"] = True
         datastream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
-        self.stream_table[datastream_index].toggle_slot(DL_slot)
+        self.stream_table[datastream_index].initialize_slot(DL_slot)
         if self.stream_information[str(STA_ID)]["use UL prompt"]:
             UL_prompt_stream_index = self.stream_information[str(STA_ID)]["UL prompt index"]
-            self.stream_table[UL_prompt_stream_index].toggle_slot(DL_slot)
+            self.stream_table[UL_prompt_stream_index].initialize_slot(DL_slot)
 
-    def toggle_DL_prompt(self, STA_ID):
+    def initialize_DL_prompt(self, STA_ID):
         self.stream_information[str(STA_ID)]["use DL prompt"] = True
         datastream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
-        self.stream_table[datastream_index].toggle_prompt()
+        self.stream_table[datastream_index].initialize_prompt()
 
-    def toggle_UL_slot(self, STA_ID, UL_slot):
+    def initialize_UL_slot(self, STA_ID, UL_slot):
         self.stream_information[str(STA_ID)]["use UL slot"] = True
 
-    def toggle_UL_prompt(self, STA_ID, strategy_name, arg_dict):
+    def initialize_UL_prompt(self, STA_ID, strategy_name, arg_dict):
         self.stream_information[str(STA_ID)]["use UL prompt"] = True
         len_stream = len(self.stream_table)
         prompt_stream = Prompt_stream(0, STA_ID, "UL prompt")
@@ -71,7 +71,7 @@ class AP(Contender):
         if self.stream_information[str(STA_ID)]["use DL slot"]:
             datastream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
             DL_slot = self.stream_table[datastream_index].slot
-            self.stream_table[-1].toggle_slot(DL_slot)
+            self.stream_table[-1].initialize_slot(DL_slot)
 
 
     def initialize(self):
@@ -373,6 +373,19 @@ class AP(Contender):
             return None
         else:
             return creation_time_table.index(oldest_creation_time)
+
+
+    def enable_DL_prompt(self, STA_ID):
+        self.stream_information[str(STA_ID)]["use DL prompt"] = True
+        stream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
+        self.stream_table[stream_index].enable_prompt()
+        print(f"{Fore.MAGENTA}AP: Enabling DL prompt -", STA_ID, f"{Style.RESET_ALL}")
+
+    def disable_DL_prompt(self, STA_ID):
+        self.stream_information[str(STA_ID)]["use DL prompt"] = False
+        stream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
+        self.stream_table[stream_index].disable_prompt()
+        print(f"{Fore.MAGENTA}AP: Disabling DL prompt -", STA_ID, f"{Style.RESET_ALL}")
 
 
 

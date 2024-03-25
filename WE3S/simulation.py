@@ -53,37 +53,36 @@ class Simulation():
     # Possible slot type:
     # "Static" -> Needs "First start" (float), "Duration" (float), "Interval" (float)
     # "Dynamic" -> Needs "Start" (table of float), "Duration" (table of float)
-    def toggle_DL_slot(self, STA_ID, slot_type, arg_dict):
-    # def toggle_DL_slot(self, STA_ID, first_start, duration, interval):
+    def initialize_DL_slot(self, STA_ID, slot_type, arg_dict):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
-        self.event_handler.toggle_DL_slot(STA_ID, slot_type, arg_dict)
+        self.event_handler.initialize_DL_slot(STA_ID, slot_type, arg_dict)
 
     # Possible prompt strategies:
     # "None" -> Needs "Prompt interval", optionally "First prompt"
-    # "TCP-like" -> Needs "Min prompt interval", "Max prompt interval", "Prompt interval incrementation step",
+    # "AIMD" -> Needs "Min prompt interval", "Max prompt interval", "Prompt interval incrementation step",
     # "Objective nb returned frames", "Max nb returned frames"
-    def toggle_DL_prompt(self, STA_ID, strategy_name, arg_dict):
+    def initialize_DL_prompt(self, STA_ID, strategy_name, arg_dict):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
-        self.event_handler.toggle_DL_prompt(STA_ID, strategy_name, arg_dict)
+        self.event_handler.initialize_DL_prompt(STA_ID, strategy_name, arg_dict)
 
-    def toggle_UL_slot(self, STA_ID, first_start, duration, interval):
+    def initialize_UL_slot(self, STA_ID, first_start, duration, interval):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
         assert(duration < interval)
         assert(first_start < interval)
-        self.event_handler.toggle_UL_slot(STA_ID, first_start, duration, interval)
+        self.event_handler.initialize_UL_slot(STA_ID, first_start, duration, interval)
 
-    def toggle_UL_prompt(self, STA_ID, strategy_name, arg_dict):
+    def initialize_UL_prompt(self, STA_ID, strategy_name, arg_dict):
         assert(STA_ID > 0 and STA_ID <= len(self.event_handler.contenders))
-        self.event_handler.toggle_UL_prompt(STA_ID, strategy_name, arg_dict)
+        self.event_handler.initialize_UL_prompt(STA_ID, strategy_name, arg_dict)
 
-    def deactivate_random_error_on_frame(self):
-        self.event_handler.deactivate_random_error_on_frame()
+    def disable_random_error_on_frame(self):
+        self.event_handler.disable_random_error_on_frame()
 
 
     def read_spec_from_dict(self, spec_dict):
         self.simulation_duration = spec_dict["Simulation duration"]
         if not spec_dict["Random channel error"]:
-            self.deactivate_channel_error()
+            self.disable_channel_error()
         self.set_buffer_capacity_AP(spec_dict["AP buffer capacity"])
         self.set_nb_STAs(spec_dict["Nb STAs"])
         for sta in spec_dict["STAs"]:
@@ -118,21 +117,21 @@ class Simulation():
                 duration = sta_dict["DL slot"]["Duration"]
                 interval = sta_dict["DL slot"]["Interval"]
                 arg_dict = {"First start": start, "Duration": duration, "Interval": interval}
-                self.toggle_DL_slot(STA_ID, "Static", arg_dict)
+                self.initialize_DL_slot(STA_ID, "Static", arg_dict)
             if sta_dict["Use DL prompt"]:
                 strategy_name = sta_dict["DL prompt"]["Strategy name"]
                 arg_dict = sta_dict["DL prompt"]
-                self.toggle_DL_prompt(STA_ID, strategy_name, arg_dict)
+                self.initialize_DL_prompt(STA_ID, strategy_name, arg_dict)
             if sta_dict["Use UL slot"]:
                 start = sta_dict["UL slot"]["Start"]
                 duration = sta_dict["UL slot"]["Duration"]
                 interval = sta_dict["UL slot"]["Interval"]
                 arg_dict = {"First start": start, "Duration": duration, "Interval": interval}
-                self.toggle_UL_slot(STA_ID, start, duration, interval)
+                self.initialize_UL_slot(STA_ID, start, duration, interval)
             if sta_dict["Use UL prompt"]:
                 strategy_name = sta_dict["UL prompt"]["Strategy name"]
                 arg_dict = sta_dict["UL prompt"]
-                self.toggle_UL_prompt(STA_ID, strategy_name, arg_dict)
+                self.initialize_UL_prompt(STA_ID, strategy_name, arg_dict)
 
     def get_nb_STAs(self):
         return len(self.event_handler.contenders)-1

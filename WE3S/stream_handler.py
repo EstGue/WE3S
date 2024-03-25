@@ -36,12 +36,12 @@ class Stream:
     def get_sender_ID(self):
         return self.frame_generator.sender_ID
 
-    def toggle_slot(self, slot):
+    def initialize_slot(self, slot):
         assert(slot is not None)
         assert(not self.use_prompt())
         self.slot = slot
 
-    def toggle_prompt(self):
+    def initialize_prompt(self):
         assert(not self.use_slot())
         self.received_prompt = False
 
@@ -180,6 +180,12 @@ class Stream:
     def drop_scheduled_frame(self):
         self.load_next_scheduled_frame()
 
+    def enable_prompt(self):
+        self.received_prompt = False
+
+    def disable_prompt(self):
+        self.received_prompt = None
+        
 ### DEBUG
 
     def verify_inner_state(self):
@@ -213,29 +219,6 @@ class Data_stream(Stream):
     def add_traffic(self, label, traffic_type, arg_dict, start, end):
         self.frame_generator.add_frame_generator(label, traffic_type, arg_dict, start, end)
         self.initialize()
-        # if traffic_type == "Constant":
-        #     frame_size = arg_dict["Frame size"]
-        #     frame_interval = arg_dict["Frame interval"]
-        #     # self.frame_generator = Constant_frame_generator(sender_ID, receiver_ID, label, frame_interval, frame_size)
-        # elif traffic_type == "Poisson":
-        #     frame_size = arg_dict["Frame size"]
-        #     frame_interval = arg_dict["Frame interval"]
-        #     # self.frame_generator = Poisson_frame_generator(sender_ID, receiver_ID, label, frame_interval, frame_size)
-        # elif traffic_type == "Hyperexponential":
-        #     frame_size = arg_dict["Frame size"]
-        #     frame_interval_1 = arg_dict["Frame interval 1"]
-        #     frame_interval_2 = arg_dict["Frame interval 2"]
-        #     probability = arg_dict["Probability"]
-        #     self.frame_generator = Hyperexponential_frame_generator(sender_ID, receiver_ID, label, frame_size,
-        #                                                                frame_interval_1, frame_interval_2, probability)
-        # elif traffic_type == "Trace":
-        #     trace_filename = arg_dict["Trace filename"]
-        #     self.frame_generator = Frame_generator_from_trace_file(sender_ID, receiver_ID, label, trace_filename)
-        # else:
-        #     print(f"{Fore.RED}ERROR: this traffic type does not exist:", traffic_type)
-        #     print(f"{Style.RESET_ALL}")
-        #     assert(0)
-
 
 
 class Prompt_stream(Stream):
@@ -259,24 +242,8 @@ class Prompt_stream(Stream):
         return self.sender_ID
 
     def set_strategy(self, strategy_name, arg_dict):
-        if strategy_name == "None":
-            if "First prompt" in arg_dict:
-                self.prompt_strategy = Prompt_strategy_None(arg_dict["Prompt interval"], arg_dict["First prompt"])
-            else:
-                self.prompt_strategy = Prompt_strategy_None(arg_dict["Prompt interval"])                
-        elif strategy_name == "TCP-like":
-            self.prompt_strategy = Prompt_strategy_TCP_like(arg_dict["Min prompt interval"],
-                                                            arg_dict["Max prompt interval"],
-                                                            arg_dict["Prompt interval incrementation step"],
-                                                            arg_dict["Objective nb returned frames"],
-                                                            arg_dict["Max nb returned frames"])
-        else:
-            print(f"{Fore.RED}This prompt strategy does not exist.")
-            print("Must be in: None, TCP-like")
-            print("Is:", strategy_name)
-            print(f"{Style.RESET_ALL}")
-            assert(0)
-        
+        self.prompt_strategy = Prompt_strategy(strategy_name, arg_dict)
+
     def get_transmission_time_raw(self):
          if len(self.pending_frame_table) == 0 and self.scheduled_frame is None:
              return None
@@ -308,6 +275,9 @@ class Prompt_stream(Stream):
         self.prompt_strategy.update_prompt_answer(complete_frame_table)
         self.load_next_scheduled_frame()
 
+    def update_prompt(self, event):
+        self.prompt_strategy.monitor_events(event)
+        
     def load_next_scheduled_frame(self):
         creation_time = self.current_time + self.prompt_strategy.get_next_prompt_interval()
         self.scheduled_frame = self.create_frame(creation_time)

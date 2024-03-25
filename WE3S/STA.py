@@ -10,6 +10,7 @@ class STA (Contender):
         self.UL_data_stream = Data_stream(self.ID, 0)
         self.DL_prompt_stream = None
         self.DL_prompt_answer = []
+        self.is_DL_prompt_active = False
 
         self.DL_slot = None
         self.wait_for_DL_prompt_answer = None
@@ -29,7 +30,7 @@ class STA (Contender):
         return self.DL_slot is not None
 
     def use_DL_prompt(self):
-        return self.DL_prompt_stream is not None
+        return self.is_DL_prompt_active
 
     def use_UL_slot(self):
         return self.UL_slot is not None
@@ -37,32 +38,33 @@ class STA (Contender):
     def use_UL_prompt(self):
         return self.received_UL_prompt is not None
 
-    def toggle_DL_slot(self, DL_slot):
+    def initialize_DL_slot(self, DL_slot):
         assert(not self.use_DL_prompt())
         self.DL_slot = DL_slot
-        self.state_counter.toggle_DL_slot(DL_slot)
+        self.state_counter.initialize_DL_slot(DL_slot)
 
-    def toggle_DL_prompt(self, strategy_name, arg_dict):
+    def initialize_DL_prompt(self, strategy_name, arg_dict):
         assert(not self.use_DL_slot())
         assert(not self.use_UL_prompt())
+        self.is_DL_prompt_active = True
         self.DL_prompt_stream = Prompt_stream(self.ID, 0, "DL prompt")
         self.DL_prompt_stream.set_strategy(strategy_name, arg_dict)
         self.wait_for_DL_prompt_answer = False
         if self.use_UL_slot():
-            self.DL_prompt_stream.toggle_slot(self.UL_slot)
+            self.DL_prompt_stream.initialize_slot(self.UL_slot)
 
-    def toggle_UL_slot(self, UL_slot):
+    def initialize_UL_slot(self, UL_slot):
         assert(not self.use_UL_prompt())
         self.UL_slot = UL_slot
-        self.UL_data_stream.toggle_slot(UL_slot)
+        self.UL_data_stream.initialize_slot(UL_slot)
         if self.use_DL_prompt():
-            self.DL_prompt_stream.toggle_slot(UL_slot)
+            self.DL_prompt_stream.initialize_slot(UL_slot)
 
-    def toggle_UL_prompt(self):
+    def initialize_UL_prompt(self):
         assert(not self.use_UL_slot())
         assert(not self.use_DL_prompt())
         self.received_UL_prompt = False
-        self.UL_data_stream.toggle_prompt()
+        self.UL_data_stream.initialize_prompt()
 
     def initialize(self):
         self.verify_initialization()
@@ -166,6 +168,7 @@ class STA (Contender):
         self.update_backoff(event)
         self.current_time = event.end
         self.verify_strategy_use(event)
+        self.update_DL_prompt(event)
         self.react_to_DL_prompt_answer(event)
         self.remove_sent_frames(event)
         self.update_scheduled_to_pending()
@@ -248,10 +251,10 @@ class STA (Contender):
                         self.UL_data_stream.remove_frame(frame.ID)
                         if self.use_UL_prompt() and not self.UL_data_stream.is_pending():
                             self.received_UL_prompt = False
-                        # print(f"{Fore.RED}The STA is not supposed to send a frame different from UL Tx, DL prompt or ACK")
-                        # print("Frame:", frame.get_dictionary())
-                        # print(f"{Style.RESET_ALL}")
-                        # assert(0)
+
+    def update_DL_prompt(self, event):
+        if self.DL_prompt_stream is not None:
+            self.DL_prompt_stream.update_prompt(event)
 
     def react_to_DL_prompt_answer(self, event):
         if self.wait_for_DL_prompt_answer:
@@ -293,6 +296,15 @@ class STA (Contender):
             if len(event.frame_table) == 1 and event.frame_table[0].label == "UL prompt" and not event.is_error():
                 if event.is_receiver(self.ID):
                     self.received_UL_prompt = True
+
+
+    def enable_DL_prompt(self):
+        self.is_DL_prompt_active = True
+        print(f"{Fore.MAGENTA}STA: Enabling DL prompt -", self.ID, f"{Style.RESET_ALL}")
+
+    def disable_DL_prompt(self):
+        self.is_DL_prompt_active = False
+        print(f"{Fore.MAGENTA}STA: Disabling DL prompt -", self.ID, f"{Style.RESET_ALL}")
 
 
 
