@@ -220,7 +220,59 @@ class Data_stream(Stream):
         self.frame_generator.add_frame_generator(label, traffic_type, arg_dict, start, end)
         self.initialize()
 
+class Synchronized_data_stream(Stream):
 
+    def __init__(self, sender_ID, receiver_ID):
+        Data_stream.__init__(self, sender_ID, receiver_ID)
+        self.stream_synchronized_with = None
+        self.shift_max = 0.1
+
+    def synchronize_with(self, stream, shift_max):
+        assert(stream is not None)
+        self.stream_synchronized_with = stream
+        self.shift_max = shift_mzx
+
+    def initialize_slot(self, slot):
+        print(f"{Fore.RED}Impossible to synchronize if the stream uses slots.")
+        print(f"{Style.RESET_ALL}")
+        assert(False)
+
+    def initialize_prompt(self):
+        print(f"{Fore.RED}Impossible to synchronize if the stream uses prompts.")
+        print(f"{Style.RESET_ALL}")
+        assert(False)
+
+    def is_pending(self):
+        return self.get_transmission_time(0) == -1
+
+    def get_transmission_time(self, backoff):
+        local_transmission_time = Data_stream.get_transmission_time(self, backoff)
+        other_transmission_time = self.stream_synchronized_with.get_transmission_time(0)
+        if local_transmission_time is None or other_transmission_time is None:
+            return local_transmission_time
+
+        if local_transmission_time == -1 and other_transmission_time == -1:
+            return local_transmission_time
+        elif local_transmission_time == -1 and other_transmission_time >= 0:
+            difference = other_transmission_time - self.current_time
+            if difference >= 1 * 10**-3 and difference < self.shift_max:
+                return other_transmission_time - 1 * 10**-3
+            else:
+                return local_transmission_time
+        elif local_transmission_time >= 0 and other_transmission_time == -1:
+            return local_transmission_time
+        elif local_transmission_time >= 0 and other_transmission_time >= 0:
+            if local_transmission_time >= other_transmission_time:
+                return local_transmission_time
+            else:
+                difference = other_transmission_time - local_transmission_time
+                if difference > 1 * 10**-3 and difference < self.shift_max:
+                    return other_transmission_time - 1*10**-3
+                else:
+                    return local_transmission_time
+
+            
+        
 class Prompt_stream(Stream):
 
     def __init__(self, sender_ID, receiver_ID, label):

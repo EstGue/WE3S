@@ -40,7 +40,7 @@
 		"Interval": 0.1
 	    },
 	    "DL prompt": {
-		"Strategy name": "None",
+		"Strategy name": "Constant",
 		"Prompt interval": 0.02
 	    },
 	    "UL slot": {
@@ -49,7 +49,7 @@
 		"Interval": 0.1
 	    },
 	    "UL prompt": {
-		"Strategy name": "None",
+		"Strategy name": "Constant",
 		"Prompt interval": 0.001
 	    }
 	},

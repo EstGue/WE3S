@@ -52,6 +52,11 @@ class STA (Contender):
         self.wait_for_DL_prompt_answer = False
         if self.use_UL_slot():
             self.DL_prompt_stream.initialize_slot(self.UL_slot)
+        if strategy_name == "Disabling AIMD":
+            tmp = self.UL_data_stream.frame_generator
+            self.UL_data_stream = Synchronized_data_stream(self.ID, 0)
+            self.UL_data_stream.frame_generator = tmp
+            self.UL_data_stream.synchronize_with(self.DL_prompt_stream, arg_dict["Shift max"])
 
     def initialize_UL_slot(self, UL_slot):
         assert(not self.use_UL_prompt())
@@ -355,11 +360,5 @@ class STA (Contender):
             "use UL slot": self.use_UL_slot(),
             "use UL prompt": self.use_UL_prompt()
         }
-        if self.use_DL_slot():
-            result["DL slot"] = self.DL_slot.get_dictionary()
-        if self.use_DL_prompt():
-            result["DL prompt"] = self.DL_prompt_stream.prompt_strategy.get_dictionary()
-        if self.use_UL_slot():
-            result["UL slot"] = self.UL_slot.get_dictionary()
         result["counters"] = self.state_counter.get_dictionary()
         return result

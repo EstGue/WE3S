@@ -32,7 +32,7 @@ class Card_state:
 
 
 
-    def toggle_DL_slot(self, DL_slot):
+    def initialize_DL_slot(self, DL_slot):
         self.DL_slot = DL_slot
         self.wakeup_time = None
 
@@ -175,7 +175,12 @@ class Card_state:
     def update_next_scheduled_transmission(self, next_scheduled_transmission):
         if next_scheduled_transmission is None:
             return
-        assert(self.current_time < next_scheduled_transmission or next_scheduled_transmission < 0)
+        if self.current_time >= next_scheduled_transmission and next_scheduled_transmission >= 0:
+            print(f"{Fore.RED}The scheduled transmission can only be in the future, or -1 if immediate.")
+            print("Current time:", self.current_time)
+            print("Next_scheduled transmission:", next_scheduled_transmission)
+            print(f"{Style.RESET_ALL}")
+            assert(False)
         self.next_scheduled_transmission = next_scheduled_transmission
 
 
