@@ -200,6 +200,8 @@ class Event_handler:
             STA_dict["CCA time"] = float(state_counter.CCA_busy)
             STA_dict["idle time"] = float(state_counter.idle)
             STA_dict["doze time"] = float(state_counter.doze)
+            STA_dict["Switch awake to doze"] = state_counter.nb_switch_awake_to_doze
+            STA_dict["Switch doze to awake"] = state_counter.nb_switch_doze_to_awake
             all_STA_dict[str(STA_ID)] = STA_dict.copy()
         
         gc.disable()

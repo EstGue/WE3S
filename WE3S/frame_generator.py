@@ -410,6 +410,8 @@ class Frame_generator_trace:
             self.next_frame = None
             return
         self.next_frame = Frame(creation_time, None, None, label, None, size)
+        self.frame_counter += 1
+        self.total_generated_data += self.next_frame.size
 
 
     def init_first_frame(self):

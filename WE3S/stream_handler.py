@@ -230,7 +230,7 @@ class Synchronized_data_stream(Stream):
     def synchronize_with(self, stream, shift_max):
         assert(stream is not None)
         self.stream_synchronized_with = stream
-        self.shift_max = shift_mzx
+        self.shift_max = shift_max
 
     def initialize_slot(self, slot):
         print(f"{Fore.RED}Impossible to synchronize if the stream uses slots.")
