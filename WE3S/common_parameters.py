@@ -16,7 +16,6 @@ SIFS = Timestamp(10 * 10**-6)
 DIFS = Timestamp(50 * 10**-6)
 BACKOFF_SLOT = Timestamp(20 * 10**-6)
 PHY_HEADER_DURATION = Timestamp(210 * 10**-6)
-# PHY_HEADER_DURATION = Timestamp(53 * 10**-6)
 
 #Values for 5 GHz band
 # SIFS = Timestamp(16 * 10**-6)

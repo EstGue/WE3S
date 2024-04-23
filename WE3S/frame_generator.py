@@ -68,7 +68,7 @@ class Aggregated_frame_generator:
         for i in range(len(self.generator_table)):
             time = self.generator_table[i].get_current_frame_time()
             time_table.append(time)
-            if time > 0:
+            if time >= 0:
                 reducted_time_table.append(time)
 
         if len(reducted_time_table) == 0:

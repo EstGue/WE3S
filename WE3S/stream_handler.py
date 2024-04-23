@@ -159,6 +159,7 @@ class Stream:
     def load_next_scheduled_frame(self):
         self.frame_generator.load_next_frame()
         self.scheduled_frame = self.frame_generator.get_current_frame()
+        assert(self.scheduled_frame is not None)
 
 
     def update_time(self, current_time):
