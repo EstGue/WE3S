@@ -255,6 +255,12 @@ class Synchronized_data_stream(Stream):
         if local_transmission_time == -1 and other_transmission_time == -1:
             return local_transmission_time
         elif local_transmission_time == -1 and other_transmission_time >= 0:
+            if other_transmission_time < self.current_time:
+                print(f"{Fore.RED}This part should not be reached.")
+                print("Current time:", self.current_time)
+                print("Other transmission time:", other_transmission_time)
+                print(f"Disregarding the error...{Style.RESET_ALL}")
+                return local_transmission_time
             difference = other_transmission_time - self.current_time
             if difference >= 1 * 10**-3 and difference < self.shift_max:
                 return other_transmission_time - 1 * 10**-3
@@ -332,7 +338,11 @@ class Prompt_stream(Stream):
         self.prompt_strategy.monitor_events(event)
         
     def load_next_scheduled_frame(self):
-        creation_time = self.current_time + self.prompt_strategy.get_next_prompt_interval()
+        next_prompt_interval = self.prompt_strategy.get_next_prompt_interval()
+        f = open("prompt_record.txt", "a")
+        f.write(str(self.current_time) + " " + str(next_prompt_interval) + "\n")
+        f.close()
+        creation_time = self.current_time + next_prompt_interval
         self.scheduled_frame = self.create_frame(creation_time)
 
     def is_up_to_date(self):

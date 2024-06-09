@@ -290,6 +290,7 @@ class AP(Contender):
             if frame.sender_ID == self.ID:
                 if not frame.has_collided and not frame.is_in_error:
                     if frame.label != "beacon" and frame.label != "UL prompt" and frame.label != "ACK":
+                        # print(f"{Fore.YELLOW}\t\tFRAME DELAY:", (self.current_time - frame.creation_time) * 10**3, f"ms{Style.RESET_ALL}")
                         STA_ID = frame.receiver_ID
                         stream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
                         self.stream_table[stream_index].remove_frame(frame.ID)

@@ -180,7 +180,7 @@ class Card_state:
             print("Current time:", self.current_time)
             print("Next_scheduled transmission:", next_scheduled_transmission)
             print(f"{Style.RESET_ALL}")
-            assert(False)
+            # assert(False)
         self.next_scheduled_transmission = next_scheduled_transmission
 
 

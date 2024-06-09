@@ -24,11 +24,13 @@ class Aggregated_frame_generator:
             generator = Frame_generator_Poisson(label, arg_dict, start, end)
         elif traffic_type == "Hyperexponential":
             generator = Frame_generator_hyperexponential(label, arg_dict, start, end)
+        elif traffic_type == "Batch_Poisson":
+            generator = Frame_generator_batch_Poisson(label, arg_dict, start, end)
         elif traffic_type == "Trace":
             generator = Frame_generator_trace(label, arg_dict, start, end)
         else:
             print(f"{Fore.RED}Unrecognized traffic type")
-            print("Possible traffic type: CBR, Poisson, Hyperexponential, Trace")
+            print("Possible traffic type: CBR, Poisson, Hyperexponential, Batch_Poisson, Trace")
             print("Given traffic type:", traffic_type)
             print(f"{Style.RESET_ALL}")
             assert(False)
@@ -356,6 +358,85 @@ class Frame_generator_hyperexponential:
                 self.next_frame_time = -1
 
 
+class Frame_generator_batch_Poisson:
+
+    def __init__(self, label, arg_dict, start, end):
+        self.label = label
+
+        if start is not None and end is not None:
+            assert(start < end)
+        self.generation_start = start
+        self.generation_end = end
+
+        self.frame_size = arg_dict["Frame size"]
+        self.batch_interval = arg_dict["Batch interval"]
+        self.batch_number_min = arg_dict["Batch number min"]
+        self.batch_number_max = arg_dict["Batch number max"]
+        assert(self.frame_size > 0)
+        assert(self.batch_interval > 0)
+        assert(self.batch_number_min > 0)
+        assert(self.batch_number_max > 0)
+        assert(self.batch_number_min <= self.batch_number_max)
+
+        self.frame_counter = 0
+        self.total_generated_data = 0
+        self.current_frame = None
+        self.next_frame_time = None
+        self.already_generated_frames_in_current_batch = None
+        self.current_batch_number = None
+
+        self.init_first_frame()
+
+    def get_current_frame(self):
+        return self.current_frame
+
+    def get_current_frame_time(self):
+        if self.current_frame is not None:
+            return self.current_frame.creation_time
+        else:
+            return -1
+
+    def get_next_frame_time(self):
+        return self.next_frame_time
+        
+    def load_next_frame(self):
+        assert(self.next_frame_time is not None)
+        if self.next_frame_time == -1:
+            self.current_frame = None
+        else:
+            self.current_frame = Frame(self.next_frame_time, None, None,
+                                       self.label, None, self.frame_size)
+            self.frame_counter += 1
+            self.total_generated_data += self.frame_size
+            # Update self.next_frame_time
+            if self.already_generated_frames_in_current_batch < self.current_batch_number:
+                self.already_generated_frames_in_current_batch += 1
+            else:
+                self.already_generated_frames_in_current_batch = 0
+                self.current_batch_number = random.randint(self.batch_number_min, self.batch_number_max)
+                self.next_frame_time += random.exponential(self.batch_interval, size=1)[0]
+            if self.generation_end is not None and current_frame_time > self.generation_end:
+                self.next_frame_time = -1
+
+    def init_first_frame(self):
+        current_frame_time = (random.randint(1, 100) / 100) * float(self.batch_interval)
+        if self.generation_start is not None and current_frame_time < self.generation_start:
+                current_frame_time += self.generation_start
+
+        if self.generation_end is not None and current_frame_time > self.generation_end:
+            self.current_frame = None
+            self.next_frame_time = -1
+        else:
+            self.current_frame = Frame(current_frame_time, None, None,
+                                       self.label, None, self.frame_size)
+            self.next_frame_time = current_frame_time
+            self.already_generated_frames_in_current_batch = 1
+            self.current_batch_number = random.randint(self.batch_number_min, self.batch_number_max)
+
+            self.frame_counter += 1
+            self.total_generated_data += self.frame_size
+
+
 
 class Frame_generator_trace:
 
@@ -364,7 +445,7 @@ class Frame_generator_trace:
         
         assert("Trace filename" in arg_dict)
         self.trace_file = open(arg_dict["Trace filename"], "r")
-        self.time_offset = 0
+        self.time_offset = Timestamp(0)
 
         if start is not None and end is not None:
             assert(start < end)
@@ -416,7 +497,7 @@ class Frame_generator_trace:
 
     def init_first_frame(self):
         if self.generation_start is not None:
-            self.time_offset = self.generation_start
+            self.time_offset = Timestamp(self.generation_start)
         line = self.trace_file.readline()
         creation_time = Timestamp(self.time_offset + float(line.split(" ")[0]))
         size = int(line.split(" ")[1])
