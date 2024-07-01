@@ -14,6 +14,7 @@ class Event:
         self.duration = Timestamp(duration)
         self.end = self.start + self.duration
         self.frame_table = frame_table
+        self.EOSP = False
 
     def is_before(self, other_event):
         return (self.start < other_event.start)

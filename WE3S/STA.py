@@ -52,7 +52,8 @@ class STA (Contender):
         self.wait_for_DL_prompt_answer = False
         if self.use_UL_slot():
             self.DL_prompt_stream.initialize_slot(self.UL_slot)
-        if strategy_name == "Disabling AIMD":
+        # if strategy_name == "Disabling AIMD":
+        if "Shift max" in arg_dict:
             tmp = self.UL_data_stream.frame_generator
             self.UL_data_stream = Synchronized_data_stream(self.ID, 0)
             self.UL_data_stream.frame_generator = tmp
@@ -268,7 +269,34 @@ class STA (Contender):
                 print("Event:", event.get_dictionary())
                 print(f"{Style.RESET_ALL}")
                 assert(0)
-            assert(event.is_receiver(self.ID))
+            self.DL_prompt_answer += event.frame_table
+            if event.EOSP == True and event.frame_table[-1].more_frames == True:
+                # The AP did not have enough time in the TXOP to send all the pending frames.
+                # The STA must generate a new DL prompt and send it with CSMA/CA.
+                self.DL_prompt_stream.generate_instant_prompt()
+                self.wait_for_DL_prompt_answer = False
+            if event.EOSP == True and event.frame_table[-1].more_frames == False:
+                # The AP has no more pending frames to send to the STA.
+                # The STA can compute its next prompt interval and switch to doze state.
+                self.wait_for_DL_prompt_answer = False
+                self.DL_prompt_stream.set_prompt_answer(self.DL_prompt_answer.copy())
+                self.DL_prompt_answer = []
+            if event.EOSP == False and event.frame_table[-1].more_frames == True:
+                # TXOP underway, the STA will get a new Transmission after a SIFS.
+                pass
+            if event.EOSP == False and event.frame_table[-1].more_frames == False:
+                print(f"{Fore.RED}A transmission cannot be with both EOSP and more_frames to False.")
+                print(f"{Style.RESET_ALL}")
+                assert(0)
+
+            
+    def react_to_DL_prompt_answer2(self, event):
+        if self.wait_for_DL_prompt_answer:
+            if not event.is_receiver(self.ID):
+                print(f"{Fore.RED}The STA", self.ID, "is waiting for an answer to its DL prompt")
+                print("Event:", event.get_dictionary())
+                print(f"{Style.RESET_ALL}")
+                assert(0)
             self.DL_prompt_answer += event.frame_table
             if event.is_EOSP():
                 self.wait_for_DL_prompt_answer = False

@@ -190,7 +190,7 @@ class Simulation():
             self.event_handler.elect_next_event()
             # self.overview_visualization.add_event(self.event_handler.next_event)
             print(f"\t\tNext event: {Fore.BLUE}", self.event_handler.next_event, end=f"{Style.RESET_ALL}\t")
-            print("EOSP? ", self.event_handler.next_event.is_EOSP())
+            print("EOSP? ", self.event_handler.next_event.EOSP)
             print("\t\tCollision? ", self.event_handler.next_event.is_collision(), end="\t")
             print("Error? ", self.event_handler.next_event.is_error())
             if len(self.event_handler.contenders) > 1:

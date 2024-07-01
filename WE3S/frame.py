@@ -21,7 +21,7 @@ class Frame:
 
         self.has_collided = False
         self.is_in_error = False
-        self.EOSP = False
+        self.more_frames = True
         
 
     def get_dictionary(self):

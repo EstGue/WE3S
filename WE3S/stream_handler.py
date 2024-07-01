@@ -50,7 +50,7 @@ class Stream:
     def get_frames(self):
         if len(self.pending_frame_table) != 0:
             if len(self.pending_frame_table) <= MAX_AGGREGATED_FRAMES:
-                self.pending_frame_table[-1].EOSP = True
+                self.pending_frame_table[-1].more_frames = False
                 return self.pending_frame_table
             else:
                 return self.pending_frame_table[:MAX_AGGREGATED_FRAMES]
@@ -62,7 +62,7 @@ class Stream:
 
     def create_ACK(self):
         ACK = Frame(self.current_time, self.get_sender_ID(), self.get_receiver_ID(), "ACK", "HIGH", ACK_SIZE)
-        ACK.EOSP = True
+        ACK.more_frames = False
         return ACK
 
     def get_transmission_time(self, backoff):
@@ -314,7 +314,7 @@ class Prompt_stream(Stream):
          return Stream.get_transmission_time_slot(self, backoff)
 
     def create_frame(self, creation_time):
-        assert(creation_time > self.current_time)
+        assert(creation_time >= self.current_time)
         return Frame(creation_time, self.sender_ID, self.receiver_ID, self.label, "LOW", PROMPT_SIZE)
 
     def remove_frame(self, frame_ID):
@@ -345,6 +345,12 @@ class Prompt_stream(Stream):
         creation_time = self.current_time + next_prompt_interval
         self.scheduled_frame = self.create_frame(creation_time)
 
+    def generate_instant_prompt(self):
+        f = open("prompt_record.txt", "a")
+        f.write(str(self.current_time) + "\n")
+        f.close()
+        self.scheduled_frame = self.create_frame(self.current_time)
+        
     def is_up_to_date(self):
         if self.scheduled_frame is None:
             return True

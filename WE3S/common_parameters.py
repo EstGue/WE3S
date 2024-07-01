@@ -26,6 +26,7 @@ PHY_HEADER_DURATION = Timestamp(20 * 10**-6)
 MAC_HEADER_SIZE = 34 * 8
 ACK_DURATION = SIFS + Timestamp(40 * 10**-6)
 
+TXOP_MAX = Timestamp(3 * 10**-3)
 
 PER = 1/10
 

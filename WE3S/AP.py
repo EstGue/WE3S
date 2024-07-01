@@ -14,6 +14,7 @@ class AP(Contender):
         self.received_DL_prompt = -1
         self.sent_UL_prompt = -1
         self.UL_prompt_answer = []
+        self.TXOP_start = None
 
 
 ### INITIALIZATION and related functions
@@ -196,6 +197,18 @@ class AP(Contender):
             assert(stream.slot.is_in_SP(event_start))
         event_frames = stream.get_frames().copy()
         event = Event(event_start, event_duration, event_frames)
+        if self.received_DL_prompt != -1:
+            if event.end - self.TXOP_start > TXOP_MAX:
+                # The TXOP will be over at the end of the event.
+                self.received_DL_prompt = -1
+                self.TXOP_start = None
+                event.EOSP = True
+            if event.frame_table[-1].more_frames == False:
+                # The AP has no more frames to send after this Transmission.
+                # The TXOP ends.
+                self.received_DL_prompt = -1
+                self.TXOP_start = None
+                event.EOSP = True
         return event
 
 
@@ -254,8 +267,8 @@ class AP(Contender):
         self.remove_sent_frames(event)
         self.update_stream_time()
         self.update_scheduled_to_pending()
-        if event.is_DL_prompt():
-            self.received_DL_prompt = event.get_sender_ID()
+        # if event.is_DL_prompt():
+        #     self.received_DL_prompt = event.get_sender_ID()
         self.verify_inner_state()
 
     def update_backoff(self, event):
@@ -275,7 +288,7 @@ class AP(Contender):
             if frame.sender_ID == self.ID:
                 if not frame.has_collided and not frame.is_in_error:
                     assert(beacon_removed or DL_Tx_removed or UL_prompt_removed or frame.label == "ACK")
-        self.update_active_DL_prompt(event)
+        # self.update_active_DL_prompt(event)
 
     def remove_sent_beacon(self, event):
         for frame in event.frame_table.copy():
@@ -311,20 +324,21 @@ class AP(Contender):
                         has_removed_frame = True
         return has_removed_frame
 
-    def update_active_DL_prompt(self, event):
-        if self.received_DL_prompt != -1:
-            stream_index = self.stream_information[str(self.received_DL_prompt)]["DL Tx index"]
-            if event.is_sender(self.ID):
-                if event.is_EOSP() and not event.is_collision() and not event.is_error():
-                    self.received_DL_prompt = -1
-                if len(event.frame_table) == 1 and event.frame_table[0].label == "ACK":
-                    self.received_DL_prompt = -1
+    # def update_active_DL_prompt(self, event):
+    #     if self.received_DL_prompt != -1:
+    #         stream_index = self.stream_information[str(self.received_DL_prompt)]["DL Tx index"]
+    #         if event.is_sender(self.ID):
+    #             if event.is_EOSP() and not event.is_collision() and not event.is_error():
+    #                 self.received_DL_prompt = -1
+    #             if len(event.frame_table) == 1 and event.frame_table[0].label == "ACK":
+    #                 self.received_DL_prompt = -1
 
     def update_received_DL_prompt(self, event):
         if not event.is_collision() and not event.is_error() and event.is_receiver(self.ID):
             if len(event.frame_table) == 1 and event.frame_table[0].label == "DL prompt":
                 assert(self.stream_information[str(event.frame_table[0].sender_ID)]["use DL prompt"])
                 self.received_DL_prompt = event.frame_table[0].sender_ID
+                self.TXOP_start = event.end
 
     def update_UL_prompt_answer(self, event):
         if self.sent_UL_prompt != -1:
