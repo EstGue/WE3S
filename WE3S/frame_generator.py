@@ -91,7 +91,7 @@ class Aggregated_frame_generator:
                 self.next_index = time_table.index(next_frame_time)
             
         
-    
+
     def load_next_frame(self):
         if self.current_index == -1:
             return
@@ -117,6 +117,7 @@ class Aggregated_frame_generator:
             next_frame_time = min(reducted_time_table)
             self.next_index = time_table.index(next_frame_time)
 
+            
     def get_frame_counter(self):
         res = 0
         for gen in self.generator_table:

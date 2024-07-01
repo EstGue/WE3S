@@ -15,6 +15,7 @@ class AP(Contender):
         self.sent_UL_prompt = -1
         self.UL_prompt_answer = []
         self.TXOP_start = None
+        self.TXOP_dest = None
 
 
 ### INITIALIZATION and related functions
@@ -116,6 +117,8 @@ class AP(Contender):
             return int(self.stream_information[str(self.received_DL_prompt)]["DL Tx index"])
         if self.stream_table[0].is_pending() and self.sent_UL_prompt == -1: # Beacons
             return 0
+        if self.TXOP_start is not None:
+            return int(self.stream_information[str(self.TXOP_dest)]["DL Tx index"])
         transmission_time_table = [stream.get_transmission_time(self.backoff) for stream in self.stream_table]
         if self.no_scheduled_transmission():
             return None
@@ -197,23 +200,35 @@ class AP(Contender):
             assert(stream.slot.is_in_SP(event_start))
         event_frames = stream.get_frames().copy()
         event = Event(event_start, event_duration, event_frames)
+        if self.TXOP_start is not None:
+            if event.end - self.TXOP_start > TXOP_MAX:
+                self.TXOP_start = None
+                self.TXOP_dest = None
+                event.EOSP = True
+            if stream.use_slot():
+                if not stream.slot.is_in_SP(event.end):
+                    self.TXOP_start = None
+                    self.TXOP_dest = None
+                    event.EOSP = True
         if self.received_DL_prompt != -1:
             if event.end - self.TXOP_start > TXOP_MAX:
                 # The TXOP will be over at the end of the event.
                 self.received_DL_prompt = -1
                 self.TXOP_start = None
+                self.TXOP_dest = None
                 event.EOSP = True
             if event.frame_table[-1].more_frames == False:
                 # The AP has no more frames to send after this Transmission.
                 # The TXOP ends.
                 self.received_DL_prompt = -1
                 self.TXOP_start = None
+                self.TXOP_dest = None
                 event.EOSP = True
         return event
 
 
     def create_event_start(self, stream):
-        if self.received_DL_prompt != -1:
+        if self.received_DL_prompt != -1 or self.TXOP_start is not None:
             return self.current_time + SIFS
         transmission_time = stream.get_transmission_time(self.backoff)
         assert(transmission_time is not None)
@@ -264,11 +279,10 @@ class AP(Contender):
         self.current_time = event.end
         self.update_UL_prompt_answer(event)
         self.update_received_DL_prompt(event)
+        self.update_TXOP(event)
         self.remove_sent_frames(event)
         self.update_stream_time()
         self.update_scheduled_to_pending()
-        # if event.is_DL_prompt():
-        #     self.received_DL_prompt = event.get_sender_ID()
         self.verify_inner_state()
 
     def update_backoff(self, event):
@@ -288,7 +302,6 @@ class AP(Contender):
             if frame.sender_ID == self.ID:
                 if not frame.has_collided and not frame.is_in_error:
                     assert(beacon_removed or DL_Tx_removed or UL_prompt_removed or frame.label == "ACK")
-        # self.update_active_DL_prompt(event)
 
     def remove_sent_beacon(self, event):
         for frame in event.frame_table.copy():
@@ -303,7 +316,6 @@ class AP(Contender):
             if frame.sender_ID == self.ID:
                 if not frame.has_collided and not frame.is_in_error:
                     if frame.label != "beacon" and frame.label != "UL prompt" and frame.label != "ACK":
-                        # print(f"{Fore.YELLOW}\t\tFRAME DELAY:", (self.current_time - frame.creation_time) * 10**3, f"ms{Style.RESET_ALL}")
                         STA_ID = frame.receiver_ID
                         stream_index = self.stream_information[str(STA_ID)]["DL Tx index"]
                         self.stream_table[stream_index].remove_frame(frame.ID)
@@ -324,14 +336,6 @@ class AP(Contender):
                         has_removed_frame = True
         return has_removed_frame
 
-    # def update_active_DL_prompt(self, event):
-    #     if self.received_DL_prompt != -1:
-    #         stream_index = self.stream_information[str(self.received_DL_prompt)]["DL Tx index"]
-    #         if event.is_sender(self.ID):
-    #             if event.is_EOSP() and not event.is_collision() and not event.is_error():
-    #                 self.received_DL_prompt = -1
-    #             if len(event.frame_table) == 1 and event.frame_table[0].label == "ACK":
-    #                 self.received_DL_prompt = -1
 
     def update_received_DL_prompt(self, event):
         if not event.is_collision() and not event.is_error() and event.is_receiver(self.ID):
@@ -339,6 +343,7 @@ class AP(Contender):
                 assert(self.stream_information[str(event.frame_table[0].sender_ID)]["use DL prompt"])
                 self.received_DL_prompt = event.frame_table[0].sender_ID
                 self.TXOP_start = event.end
+                self.TXOP_dest = self.received_DL_prompt
 
     def update_UL_prompt_answer(self, event):
         if self.sent_UL_prompt != -1:
@@ -350,6 +355,26 @@ class AP(Contender):
                 self.stream_table[stream_index].set_prompt_answer(self.UL_prompt_answer)
                 self.UL_prompt_answer = []
                 self.sent_UL_prompt = -1
+
+    def update_TXOP(self, event):
+        if self.TXOP_start is not None:
+            return
+        if event.EOSP:
+            return
+        for frame in event.frame_table:
+            if frame.sender_ID != self.ID:
+                return
+            if frame.label == "beacon" or frame.label == "UL prompt" or frame.label == "ACK":
+                return
+        dest = event.frame_table[-1].receiver_ID
+        stream_id = self.stream_information[str(dest)]["DL Tx index"]
+        if self.stream_table[stream_id].use_slot():
+            if not self.stream_table[stream_id].slot.is_in_SP(event.end):
+                return
+        if event.frame_table[-1].more_frames:
+            self.TXOP_start = event.start
+            self.TXOP_dest = dest
+            
                 
     def update_stream_time(self):
         for stream in self.stream_table:

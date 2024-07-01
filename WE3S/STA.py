@@ -18,6 +18,8 @@ class STA (Contender):
         self.received_UL_prompt = None
 
         self.buffer_capacity = STA_BUFFER_CAPACITY
+        
+        self.TXOP_start = None
 
         self.wlan.add_STA()
 
@@ -141,6 +143,14 @@ class STA (Contender):
         event_duration = self.create_event_duration(stream)
         event_frames = stream.get_frames()[:MAX_AGGREGATED_FRAMES]
         event = Event(event_start, event_duration, event_frames.copy())
+        if self.TXOP_start is not None:
+            if event.end - self.TXOP_start > TXOP_MAX:
+                self.TXOP_start = None
+                event.EOSP = True
+            if stream.use_slot():
+                if not stream.slot.is_in_SP(event.end):
+                    self.TXOP_start = None
+                    event.EOSP = True
         return event
 
 
@@ -149,9 +159,10 @@ class STA (Contender):
             if self.received_UL_prompt:
                 return self.current_time + SIFS
             return None
-        else:
-            event_start = stream.get_transmission_time(self.backoff)
-            return max(event_start, float(self.current_time + DIFS + self.backoff * BACKOFF_SLOT))
+        if self.TXOP_start is not None:
+            return self.current_time + SIFS
+        event_start = stream.get_transmission_time(self.backoff)
+        return max(event_start, float(self.current_time + DIFS + self.backoff * BACKOFF_SLOT))
 
     def create_event_duration(self, stream):
         data_rate = self.wlan.get_link_capacity(self.ID)
@@ -176,6 +187,7 @@ class STA (Contender):
         self.verify_strategy_use(event)
         self.update_DL_prompt(event)
         self.react_to_DL_prompt_answer(event)
+        self.update_TXOP(event)
         self.remove_sent_frames(event)
         self.update_scheduled_to_pending()
         self.react_to_UL_prompts(event)
@@ -289,23 +301,23 @@ class STA (Contender):
                 print(f"{Style.RESET_ALL}")
                 assert(0)
 
+
+    def update_TXOP(self, event):
+        if self.TXOP_start is not None:
+            return
+        if event.EOSP:
+            return
+        for frame in event.frame_table:
+            if frame.sender_ID != self.ID:
+                return
+            if frame.label == "DL prompt" or frame.label == "ACK":
+                return
+        if self.UL_data_stream.use_slot():
+            if not self.UL_data_stream.slot.is_in_SP(event.end):
+                return
+        if event.frame_table[-1].more_frames:
+            self.TXOP_start = event.start
             
-    def react_to_DL_prompt_answer2(self, event):
-        if self.wait_for_DL_prompt_answer:
-            if not event.is_receiver(self.ID):
-                print(f"{Fore.RED}The STA", self.ID, "is waiting for an answer to its DL prompt")
-                print("Event:", event.get_dictionary())
-                print(f"{Style.RESET_ALL}")
-                assert(0)
-            self.DL_prompt_answer += event.frame_table
-            if event.is_EOSP():
-                self.wait_for_DL_prompt_answer = False
-                self.DL_prompt_stream.set_prompt_answer(self.DL_prompt_answer.copy())
-                self.DL_prompt_answer = []
-            elif len(event.frame_table) == 1 and event.frame_table[0].label == "ACK":
-                self.wait_for_DL_prompt_answer = False
-                self.DL_prompt_answer = []
-                self.DL_prompt_stream.set_prompt_answer(self.DL_prompt_answer.copy())
                         
     def update_scheduled_to_pending(self):
         self.UL_data_stream.update_time(self.current_time)

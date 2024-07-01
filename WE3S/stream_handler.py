@@ -159,7 +159,16 @@ class Stream:
     def load_next_scheduled_frame(self):
         self.frame_generator.load_next_frame()
         self.scheduled_frame = self.frame_generator.get_current_frame()
-        assert(self.scheduled_frame is not None)
+        if self.scheduled_frame is None:
+            print(f"{Fore.RED}Scheduled frame is None, when it should exist")
+            print("Current index:", self.frame_generator.current_index)
+            print("Next index:", self.frame_generator.next_index)
+            for gen in self.frame_generator.generator_table:
+                print(gen)
+                print("-- Current frame:", gen.get_current_frame_time())
+                print("-- Next frame:", gen.get_next_frame_time())
+            print(f"{Style.RESET_ALL}")
+            assert(False)
 
 
     def update_time(self, current_time):
